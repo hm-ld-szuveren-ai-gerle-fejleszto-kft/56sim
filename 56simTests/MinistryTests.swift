@@ -145,6 +145,15 @@ struct MinistryTests {
         }
     }
 
+    @Test("State refusals: 25+25, disjoint, non-empty")
+    func stateRefusals() {
+        #expect(StateRefusals.neutralize.count == 25)
+        #expect(StateRefusals.clear.count == 25)
+        #expect(Set(StateRefusals.neutralize).isDisjoint(with: Set(StateRefusals.clear)))
+        #expect(StateRefusals.neutralize.allSatisfy { !$0.isEmpty })
+        #expect(StateRefusals.clear.allSatisfy { !$0.isEmpty })
+    }
+
     @Test("Amendment history sorts newest first")
     func amendmentHistoryOrder() throws {
         let context = try makeRegistry()

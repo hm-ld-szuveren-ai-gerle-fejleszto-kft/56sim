@@ -158,6 +158,7 @@ struct CitizenDetailView: View {
 
  @Environment(\.modelContext) private var modelContext
  @State private var isReporting = false
+ @State private var denial: String?
  @State private var gate = CheckpointGateRunner()
 
  var body: some View {
@@ -233,6 +234,10 @@ struct CitizenDetailView: View {
    }
    Section {
     Button("Mark Neutralized", role: .destructive) {
+     if citizen.status == .neutralized {
+      denial = StateRefusals.refusal(for: .neutralized)
+      return
+     }
      gate.request {
       RecordOffice.amend(
        citizen,
@@ -245,6 +250,11 @@ struct CitizenDetailView: View {
      }
     }
     Button("Mark Cleared") {
+     if citizen.status == .neutralized || citizen.status == .cleared {
+      // The dead are not awaiting promotion to citizen, and the cleared need no second clearing.
+      denial = StateRefusals.refusal(for: .cleared)
+      return
+     }
      gate.request {
       RecordOffice.amend(
        citizen,
@@ -259,6 +269,15 @@ struct CitizenDetailView: View {
     Text("Decisions of the Authority are final and do not require due process.")
    }
   }
+  .alert(
+   "Ministry of Records",
+   isPresented: Binding(
+    get: { denial != nil },
+    set: { if !$0 { denial = nil } }
+   ),
+   actions: { Button("Comply") {} },
+   message: { Text(denial ?? "") }
+  )
   .navigationTitle(citizen.name)
   .toolbar {
    ToolbarItem {
