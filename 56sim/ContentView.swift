@@ -250,7 +250,8 @@ struct CitizenDetailView: View {
      }
     }
     Button("Mark Cleared") {
-     if citizen.status == .cleared {
+     if citizen.status == .neutralized || citizen.status == .cleared {
+      // The dead are not awaiting promotion to citizen, and the cleared need no second clearing.
       denial = StateRefusals.refusal(for: .cleared)
       return
      }
