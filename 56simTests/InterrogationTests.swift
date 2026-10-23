@@ -70,7 +70,8 @@ struct InterrogationTests {
         }
 
         #expect(model.verdictText != nil)
-        #expect(model.phase == .verdict)
+        #expect(model.phase == .awaitingAnswer, "a verdict never closes the room")
+        #expect(model.canAnswer)
         #expect(model.questionCount >= 5)
         #expect(model.errorMessage == nil)
     }
@@ -83,5 +84,38 @@ struct InterrogationTests {
         #expect(model.messages.map(\.content).contains("I confess: ate two ration coupons."))
         await model.denyEverything()
         #expect(model.messages.map(\.content).contains("I deny everything."))
+    }
+
+    @Test("The session opens with the scripted line, never a stage direction")
+    func scriptedOpen() async {
+        let model = InterrogationSessionModel(interrogator: StubInterrogator())
+        await model.begin()
+        #expect(model.messages.first?.role == .assistant)
+        #expect(model.messages.first?.content == Interrogation.scriptedOpening)
+        #expect(!model.messages.contains { $0.content.contains("sits down") })
+    }
+
+    @Test("A premature verdict is scrubbed from chat and hands down nothing")
+    func prematureVerdictScrubbed() async {
+        let model = InterrogationSessionModel(interrogator: StubInterrogator(earlyVerdict: true))
+        await model.begin()
+        await model.submit("I was lost.")
+        let firstModelReply = model.messages.first {
+            $0.role == .assistant && $0.content != Interrogation.scriptedOpening
+        }
+        #expect(firstModelReply?.content.contains("VERDICT:") == false)
+        #expect(model.verdictText == nil, "only the operator's demand may produce a verdict")
+        #expect(model.phase == .awaitingAnswer)
+        #expect(model.canAnswer)
+    }
+
+    @Test("A stuttered verdict marker still yields exactly one verdict")
+    func collapsedVerdictExtraction() {
+        #expect(
+            Interrogation.verdict(in: "… VERDICT: VERDICT: TEN YEARS OF APPROVED MUSIC.")
+                == "TEN YEARS OF APPROVED MUSIC."
+        )
+        #expect(Interrogation.scrubbed("VERDICT:ten years. verdict:again.") == "ten years. again.")
+        #expect(Interrogation.scrubbed("No verdict here, citizen.") == "No verdict here, citizen.")
     }
 }

@@ -14,7 +14,6 @@ enum InterrogationPhase: Equatable {
     case loading
     case awaitingAnswer
     case generating
-    case verdict
 }
 
 @Observable
@@ -29,6 +28,9 @@ final class InterrogationSessionModel {
     private let interrogator: Interrogating
     private let progressPoller: (@Sendable () -> Progress?)?
 
+    /// Set when the operator has demanded the verdict; only that reply may set one.
+    private var awaitingVerdict = false
+
     init(interrogator: Interrogating, progressPoller: (@Sendable () -> Progress?)? = nil) {
         self.interrogator = interrogator
         self.progressPoller = progressPoller
@@ -41,7 +43,7 @@ final class InterrogationSessionModel {
         messages.last(where: { $0.role == .assistant })?.content ?? ""
     }
 
-    /// Load the model (if needed) and let the interrogator open the session.
+    /// Load the model (if needed) and open the session with the scripted first line.
     func begin() async {
         guard phase == .idle else { return }
         phase = .loading
@@ -52,8 +54,11 @@ final class InterrogationSessionModel {
                 try await engine.load()
             }
             pollerTask?.cancel()
-            await respond(to: "(The suspect sits down. Begin the interrogation.)")
-            if phase == .generating { phase = .awaitingAnswer }
+            // The state always opens in character; no stage direction reaches the
+            // transcript, and the model takes over from the first answer.
+            messages.append(
+                InterrogationMessage(role: .assistant, content: Interrogation.scriptedOpening))
+            phase = .awaitingAnswer
         } catch {
             pollerTask?.cancel()
             phase = .idle
@@ -69,8 +74,9 @@ final class InterrogationSessionModel {
         messages.append(InterrogationMessage(role: .user, content: text))
         if Interrogation.isVerdictDue(questionCount: questionCount) {
             messages.append(InterrogationMessage(role: .user, content: "State your VERDICT."))
+            awaitingVerdict = true
         }
-        await respond(to: nil)
+        await respond()
         if phase == .generating { phase = .awaitingAnswer }
     }
 
@@ -90,12 +96,9 @@ final class InterrogationSessionModel {
         await begin()
     }
 
-    private func respond(to opener: String?) async {
+    private func respond() async {
         phase = .generating
         errorMessage = nil
-        if let opener {
-            messages.append(InterrogationMessage(role: .user, content: opener))
-        }
         let history = Interrogation.messages(history: messages, questionCount: questionCount)
         messages.append(InterrogationMessage(role: .assistant, content: ""))
         do {
@@ -105,15 +108,24 @@ final class InterrogationSessionModel {
                     messages[messages.count - 1].content += chunk
                 }
             }
-            if let verdict = Interrogation.verdict(in: lastAssistantDraft) {
-                verdictText = verdict
-                phase = .verdict
+            if awaitingVerdict {
+                // Only the reply to the operator's demand may hand down a verdict,
+                // and the chat stays open afterwards: the banner pins, the queue talks.
+                awaitingVerdict = false
+                if let verdict = Interrogation.verdict(in: lastAssistantDraft) {
+                    verdictText = verdict
+                }
+            } else if messages.last?.role == .assistant {
+                // A premature verdict is filed, never printed.
+                messages[messages.count - 1].content = Interrogation.scrubbed(lastAssistantDraft)
             }
         } catch {
             // Drop the empty bubble; the state denies the line ever existed.
             if messages.last?.role == .assistant, messages.last?.content.isEmpty == true {
                 messages.removeLast()
             }
+            // The demand went unanswered on the wire; it does not carry over.
+            awaitingVerdict = false
             phase = .idle
             errorMessage = "Radio interference — the foreign agent line is down."
         }
@@ -185,7 +197,7 @@ struct InterrogationView: View {
                 inputBar
             }
 
-            if model.phase == .verdict, let verdict = model.verdictText {
+            if let verdict = model.verdictText {
                 verdictBanner(verdict)
             }
         }
