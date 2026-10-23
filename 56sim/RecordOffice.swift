@@ -23,6 +23,8 @@ enum RecordOffice {
     static func amend(
         _ citizen: Citizen, field: String, old: String, new: String, in context: ModelContext
     ) {
+        // A no-op reclassification is not history; the archive declines the duplicate.
+        if field == "status", old == new { return }
         let justification = justifications[citizen.amendments.count % justifications.count]
         let amendment = RecordAmendment(
             fieldName: field,
