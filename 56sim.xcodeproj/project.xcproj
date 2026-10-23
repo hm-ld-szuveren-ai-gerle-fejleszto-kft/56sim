@@ -10,6 +10,27 @@
       "Base",
     ],
   },
+  "packages": [
+    {
+      "kind": "remote",
+      "repository": "https://github.com/ml-explore/mlx-swift-lm",
+      "version": {
+        "up-to-next-minor-version": "3.32.3",
+      },
+    }, {
+      "kind": "remote",
+      "repository": "https://github.com/huggingface/swift-huggingface",
+      "version": {
+        "version": "0.9.0",
+      },
+    }, {
+      "kind": "remote",
+      "repository": "https://github.com/huggingface/swift-transformers",
+      "version": {
+        "version": "1.3.0",
+      },
+    },
+  ],
   "files": [
     {
       "kind": "folder",
@@ -25,11 +46,14 @@
           ],
         },
       ],
-    }, {
+    },
+    { "kind": "folder", "path": "56simTests", "target-membership": [ "56simTests" ] },
+    {
       "kind": "group",
       "name": "Products",
       "children": [
         { "path": "<PRODUCTS>/56sim.app", "id": "6BCE7B24308B8EE800D1E267", "type": "wrapper.application", "index": false },
+        { "path": "<PRODUCTS>/56simTests.xctest", "id": "6BCE7B26308B8EE800D1E267", "type": "wrapper.cfbundle", "index": false },
       ],
     },
   ],
@@ -39,10 +63,41 @@
       "id": "6BCE7B23308B8EE800D1E267",
       "product": "Products/56sim.app",
       "product-type": "application",
+      "dependencies": [
+        { "kind": "package", "package": "mlx-swift-lm", "product-name": "MLXLLM" },
+        { "kind": "package", "package": "mlx-swift-lm", "product-name": "MLXLMCommon" },
+        { "kind": "package", "package": "mlx-swift-lm", "product-name": "MLXHuggingFace" },
+        { "kind": "package", "package": "swift-huggingface", "product-name": "HuggingFace" },
+        { "kind": "package", "package": "swift-transformers", "product-name": "Tokenizers" },
+        { "kind": "package", "package": "mlx-swift-lm", "product-name": "MLXHuggingFaceMacros", "product-type": "build-tool-plugin" },
+      ],
       "build-phases": [
         "compile-sources",
         "frameworks",
         "resources",
+      ],
+      "package-product-members": [
+        {
+          "package": "mlx-swift-lm",
+          "product-name": "MLXHuggingFace",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "mlx-swift-lm",
+          "product-name": "MLXLLM",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "mlx-swift-lm",
+          "product-name": "MLXLMCommon",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "swift-huggingface",
+          "product-name": "HuggingFace",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "swift-transformers",
+          "product-name": "Tokenizers",
+          "build-phase": { "build-phase": "frameworks" },
+        },
       ],
       "build-settings": {
         "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
@@ -73,6 +128,36 @@
         "SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY": "YES",
         "SWIFT_VERSION": "5.0",
         "TARGETED_DEVICE_FAMILY": "1,2",
+      },
+    }, {
+      "name": "56simTests",
+      "id": "6BCE7B25308B8EE800D1E267",
+      "product": "Products/56simTests.xctest",
+      "product-type": "bundle.unit-test",
+      "test-host-target": "56sim",
+      "dependencies": [
+        "56sim",
+      ],
+      "build-phases": [
+        "compile-sources",
+        "frameworks",
+        "resources",
+      ],
+      "build-settings": {
+        "BUNDLE_LOADER": "$(TEST_HOST)",
+        "CODE_SIGN_STYLE": "Automatic",
+        "CURRENT_PROJECT_VERSION": "1",
+        "DEVELOPMENT_TEAM": "49HVW8MB48",
+        "GENERATE_INFOPLIST_FILE": "YES",
+        "MARKETING_VERSION": "1.0",
+        "PRODUCT_BUNDLE_IDENTIFIER": "hu.0frontin.-6simTests",
+        "PRODUCT_NAME": "$(TARGET_NAME)",
+        "SWIFT_APPROACHABLE_CONCURRENCY": "YES",
+        "SWIFT_DEFAULT_ACTOR_ISOLATION": "MainActor",
+        "SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY": "YES",
+        "SWIFT_VERSION": "5.0",
+        "TARGETED_DEVICE_FAMILY": "1,2",
+        "TEST_HOST": "$(BUILT_PRODUCTS_DIR)/56sim.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/56sim",
       },
     },
   ],
@@ -129,7 +214,7 @@
     "GCC_WARN_UNINITIALIZED_AUTOS": "YES_AGGRESSIVE",
     "GCC_WARN_UNUSED_FUNCTION": "YES",
     "GCC_WARN_UNUSED_VARIABLE": "YES",
-    "IPHONEOS_DEPLOYMENT_TARGET": "27.2",
+    "IPHONEOS_DEPLOYMENT_TARGET": "27.0",
     "LOCALIZATION_PREFERS_STRING_CATALOGS": "YES",
     "MTL_ENABLE_DEBUG_INFO[config=Debug]": "INCLUDE_SOURCE",
     "MTL_ENABLE_DEBUG_INFO[config=Release]": "NO",

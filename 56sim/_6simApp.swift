@@ -5,14 +5,17 @@
 //  Created by Reka Papp on 2026-10-23.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 @main
 struct _6simApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            Citizen.self,
+            Broadcast.self,
+            Report.self,
+            RecordAmendment.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

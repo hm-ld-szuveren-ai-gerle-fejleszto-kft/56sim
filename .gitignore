@@ -1,0 +1,28 @@
+# macOS
+.DS_Store
+
+# Xcode user & build state
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+
+# Build products
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/
+
+# IDE cruft
+.idea/
+.vscode/
+
+# Session tooling state
+.omp/
