@@ -308,9 +308,9 @@ struct MinistryTests {
 
     // MARK: - Radio Moscow (directive 9)
 
-    @Test("Bulletins wrap forever and carry at least eight proclamations")
+    @Test("Bulletins wrap forever and carry at least fifty proclamations")
     func radioBulletins() {
-        #expect(RadioMoscow.bulletins.count >= 8)
+        #expect(RadioMoscow.bulletins.count >= 50)
         #expect(RadioMoscow.bulletins.allSatisfy { !$0.isEmpty })
         let count = RadioMoscow.bulletins.count
         #expect(
