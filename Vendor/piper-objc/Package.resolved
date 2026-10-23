@@ -1,0 +1,23 @@
+{
+  "pins" : [
+    {
+      "identity" : "espeak-ng-spm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/IhorShevchuk/espeak-ng-spm.git",
+      "state" : {
+        "revision" : "dda87cd7efcc832db857c78c7ae68839ba9bb43e",
+        "version" : "2025.10.11"
+      }
+    },
+    {
+      "identity" : "piper1-gpl-spm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/IhorShevchuk/piper1-gpl-spm.git",
+      "state" : {
+        "revision" : "85ccf3dc51d15fc51ed4829c62a45a41c74bfa2a",
+        "version" : "0.1.4"
+      }
+    }
+  ],
+  "version" : 2
+}
