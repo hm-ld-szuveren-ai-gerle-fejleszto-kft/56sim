@@ -146,7 +146,7 @@ struct InterrogationView: View {
     @State private var model: InterrogationSessionModel
     @State private var suspectAnswer = ""
 
-    init(interrogator: Interrogating = InterrogationEngine()) {
+    init(interrogator: Interrogating = InterrogationEngine.shared) {
         var poller: (@Sendable () -> Progress?)?
         if let mlx = interrogator as? InterrogationEngine {
             poller = { mlx.progress }

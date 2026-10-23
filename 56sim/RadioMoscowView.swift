@@ -87,7 +87,7 @@ enum RadioMoscow {
 struct RadioMoscowView: View {
     @Query(sort: \Broadcast.postedAt, order: .reverse) private var broadcasts: [Broadcast]
 
-    @State private var announcer = PiperAnnouncer()
+    @State private var announcer = PiperAnnouncer.shared
     @State private var tickerIndex = 0
 
     private var extraTitles: [String] { broadcasts.map(\.title) }
@@ -103,7 +103,8 @@ struct RadioMoscowView: View {
                 onCycleComplete: {
                     tickerIndex += 1
                     if announcer.isSpeaking {
-                        announcer.speak(RadioMoscow.bulletin(at: tickerIndex, extraTitles: extraTitles))
+                        announcer.speak(
+                            RadioMoscow.bulletin(at: tickerIndex, extraTitles: extraTitles))
                     }
                 }
             )
@@ -168,7 +169,11 @@ private struct TickerLine: View {
             Text(line)
                 .font(.system(.body, design: .monospaced).bold())
                 .fixedSize()
-                .onGeometryChange(for: CGFloat.self) { proxy in proxy.size.width } action: { textWidth = $0 }
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.width
+                } action: {
+                    textWidth = $0
+                }
                 .offset(x: offset)
                 .onAppear {
                     offset = geo.size.width
