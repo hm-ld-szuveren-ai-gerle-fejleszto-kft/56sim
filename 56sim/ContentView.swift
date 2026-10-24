@@ -107,6 +107,9 @@ struct ContentView: View {
                             Label("Interrogation Room 407", systemImage: "lamp.desk")
                         }
                         Divider()
+                        NavigationLink(value: Ministry.paper) {
+                            Label("The People's Paper", systemImage: "newspaper")
+                        }
                         NavigationLink(value: Ministry.archive) {
                             Label("The Archive of the People", systemImage: "doc.text.magnifyingglass")
                         }
@@ -139,6 +142,7 @@ struct ContentView: View {
                 case .radio: RadioMoscowView()
                 case .poster: PosterGeneratorView()
                 case .interrogation: InterrogationView()
+                case .paper: PeoplesPaperView()
                 case .archive: ArchiveView()
                 }
             }
@@ -385,6 +389,13 @@ struct CitizenDetailView: View {
                                 )
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                                if !report.offenceCategory.isEmpty || !report.offenceSeverity.isEmpty {
+                                    Text(
+                                        "\(OffenceCategory(rawValue: report.offenceCategory)?.label ?? report.offenceCategory) · \(OffenceSeverity(rawValue: report.offenceSeverity)?.label ?? report.offenceSeverity) \(OffenceSeverity(rawValue: report.offenceSeverity)?.marks ?? "")"
+                                    )
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                }
                             }
                         }
                     }
@@ -501,6 +512,7 @@ enum Ministry: Hashable {
     case radio
     case poster
     case interrogation
+    case paper
     case archive
 }
 extension CitizenStatus {
