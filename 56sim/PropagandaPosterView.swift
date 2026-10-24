@@ -46,6 +46,54 @@ enum Propaganda {
             text: "SEVENTY YEARS OF VIGILANCE: PROTECTING THE PEOPLE FROM THE PEOPLE.",
             tagline: "Commemorative Edition · 1956–2026"
         ),
+        Slogan(
+            text: "SUSPICION IS A VIRTUE; CONFIRMATION IS A CAREER",
+            tagline: "Department of Vigilant Friendship"
+        ),
+        Slogan(
+            text: "THE QUEUE MOVES BECAUSE THE QUEUE BELIEVES",
+            tagline: "Ministry of Logistics and Hope"
+        ),
+        Slogan(
+            text: "TWO EARS ARE CITIZENS; ONE IS MERELY ANATOMY",
+            tagline: "Bureau of Listening"
+        ),
+        Slogan(
+            text: "OUR FACTORIES HUM; OTHERS MERELY CLAIM TO",
+            tagline: "Union of Industrial Optimism"
+        ),
+        Slogan(
+            text: "A STRANGER IS A FRIEND YOU HAVE NOT FILED YET",
+            tagline: "Neighbourhood Assurance Office"
+        ),
+        Slogan(
+            text: "THE RAIN IS APPROVED. THE WIND IS UNDER REVIEW",
+            tagline: "State Meteorology of the People"
+        ),
+        Slogan(
+            text: "SILENCE IS GOLD; DENUNCIATION IS PLATINUM",
+            tagline: "Treasury of Patriotic Currency"
+        ),
+        Slogan(
+            text: "WORK PLACE SAFETY: REPORT FIRST, ASK NEVER",
+            tagline: "Labour Blessing Directorate"
+        ),
+        Slogan(
+            text: "YOUR CHILDREN ARE ALSO OUR CHILDREN. ESPECIALLY YOURS",
+            tagline: "Ministry of Tomorrow's Informants"
+        ),
+        Slogan(
+            text: "THE TRAIN IS ON TIME BECAUSE TIME IS ON OUR SIDE",
+            tagline: "Railways of Inevitable Progress"
+        ),
+        Slogan(
+            text: "HISTORY IS WRITTEN DAILY. EDIT IT HONESTLY",
+            tagline: "Bureau of Living Corrections"
+        ),
+        Slogan(
+            text: "SMILE. YOU IMPROVE THE QUOTA",
+            tagline: "Office of Approved Expressions"
+        ),
     ]
 }
 
@@ -54,6 +102,8 @@ enum Palette: String, CaseIterable, Identifiable {
     case red
     case ink
     case green
+    case blue
+    case amber
 
     var id: String { rawValue }
 
@@ -62,6 +112,8 @@ enum Palette: String, CaseIterable, Identifiable {
         case .red: Color.propagandaRed
         case .ink: .black
         case .green: Color(red: 0.18, green: 0.30, blue: 0.12)
+        case .blue: Color(red: 0.0, green: 0.25, blue: 0.55)
+        case .amber: Color(red: 0.75, green: 0.5, blue: 0.0)
         }
     }
 }
