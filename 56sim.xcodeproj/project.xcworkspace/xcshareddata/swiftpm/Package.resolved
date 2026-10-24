@@ -1,5 +1,5 @@
 {
-  "originHash" : "81680f995abdbb07abf4cc3022c267760f16e1aa0157f249bd8018e21877b273",
+  "originHash" : "5a5ab28361c8085576bf7c6098f797f49690d7c777dbb4fe3af5ef348a0db314",
   "pins" : [
     {
       "identity" : "espeak-ng-spm",
@@ -44,6 +44,15 @@
       "state" : {
         "revision" : "0d8812cf11435a6e5ae6fb22fdd41ae4a13ba78b",
         "version" : "0.1.11"
+      }
+    },
+    {
+      "identity" : "sqlite.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/stephencelis/SQLite.swift",
+      "state" : {
+        "revision" : "964c300fb0736699ce945c9edb56ecd62eba27a3",
+        "version" : "0.16.0"
       }
     },
     {
