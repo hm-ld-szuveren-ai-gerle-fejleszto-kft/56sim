@@ -152,6 +152,16 @@ final class InterrogationEngine: Interrogating, @unchecked Sendable {
     static let modelID = "LiquidAI/LFM2.5-1.2B-Instruct-MLX-4bit"
     static let fallbackModelID = "mlx-community/LFM2-1.2B-4bit"
 
+    static let shared = InterrogationEngine()
+
+    /// Setup-time warming of the interrogator weights (device only: the
+    /// simulator has no MLX path and shows the interference banner instead).
+    static func prefetchWeights() {
+        #if !targetEnvironment(simulator)
+            Task { try? await shared.load() }
+        #endif
+    }
+
     private let lock = NSLock()
     private var session: ChatSession?
     private var loadTask: Task<Void, Error>?
