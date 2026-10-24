@@ -139,7 +139,9 @@ struct StateStoreTests {
         let amendments = store.amendments(citizenId: id)
         #expect(amendments.count == 7)
         for index in 0..<7 {
-            #expect(amendments[index].justification == RecordOffice.justifications[index % 5])
+            #expect(
+                amendments[index].justification
+                    == RecordOffice.justifications[index % RecordOffice.justifications.count])
         }
     }
 

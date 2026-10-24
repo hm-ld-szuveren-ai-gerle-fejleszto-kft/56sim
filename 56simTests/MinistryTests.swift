@@ -132,8 +132,8 @@ struct MinistryTests {
         #expect(amendments.count == 2)
         #expect(amendments[1].justification == RecordOffice.justifications[1])
 
-        // Rotation wraps at 5.
-        for index in 2..<7 {
+        // Rotation wraps at the full stock (the complete appendix).
+        for index in 2..<55 {
             let next = CitizenStatus.allCases[index % 3]
             RecordOffice.amend(
                 citizenId: citizenId, field: "status",
@@ -143,8 +143,20 @@ struct MinistryTests {
             )
             amendments = store.amendments(citizenId: citizenId)
             #expect(
-                amendments[index].justification == RecordOffice.justifications[index % 5])
+                amendments[index].justification
+                    == RecordOffice.justifications[index % RecordOffice.justifications.count])
         }
+    }
+
+    @Test("Justification stock holds the full appendix, non-duplicated, in order")
+    func justificationStock() {
+        // The appendix lists 46 corrections to add to the original five;
+        // the ministry minutes said "45 → 50" and miscounted, as ministries do.
+        #expect(RecordOffice.justifications.count == 51)
+        #expect(
+            Set(RecordOffice.justifications).count == RecordOffice.justifications.count)
+        #expect(RecordOffice.justifications[0] == "The record has always shown this.")
+        #expect(RecordOffice.justifications.last == "The glue is older than the objection.")
     }
 
     @Test("State refusals: 25+25, disjoint, non-empty")
@@ -316,7 +328,12 @@ struct MinistryTests {
         #expect(
             !Checkpoint.isCorrect(
                 (question.correctIndex + 1) % question.answers.count, on: question))
-        #expect(Checkpoint.questions.count >= 6)
+        #expect(Checkpoint.questions.count >= 20, "the republic asks more of you now")
+        #expect(Checkpoint.questions.allSatisfy { $0.answers.count == 4 })
+        #expect(
+            Checkpoint.questions.allSatisfy {
+                $0.correctIndex >= 0 && $0.correctIndex < $0.answers.count
+            })
     }
 
     @Test("A wrong answer detains for exactly ten seconds, then releases to the action")
@@ -332,16 +349,20 @@ struct MinistryTests {
 
     // MARK: - Defector (directive 8)
 
-    @Test("Escape graph resolves, terminates in three fates, and never loops")
+    @Test("Escape graph resolves, terminates in six fates, and never loops")
     func defectorGraph() throws {
         #expect(Defector.nodes[Defector.startID] != nil)
         let endings = Defector.nodes.values.filter(\.isEnding)
         let endingTexts = Set(endings.map(\.text))
-        #expect(endings.count >= 3)
+        #expect(endings.count >= 6)
         #expect(endingTexts.contains("REACHED AUSTRIA. TRULY."))
         #expect(endingTexts.contains("RESETTLED TO SIBERIA FOR AGRICULTURAL CONSULTANCY."))
         #expect(endingTexts.contains("SENTENCED TO 10 YEARS OF LISTENING TO APPROVED MUSIC."))
-        #expect(Defector.nodes.count >= 12)
+        #expect(
+            endingTexts.contains("MADE ATTACHÉ TO THE CIRCUS IN VIENNA. TRAPEZE, NOT TRAITS."))
+        #expect(
+            endingTexts.contains("APPOINTED MINISTER OF RUMOURS. THE RUMOURS DISAPPROVED."))
+        #expect(Defector.nodes.count >= 30)
 
         // Every choice resolves to a real node.
         for node in Defector.nodes.values {
@@ -364,6 +385,21 @@ struct MinistryTests {
         var stack = Set<String>()
         #expect(
             visit(Defector.startID, stack: &stack), "history repeats itself — cycles are banned")
+
+        // The new fates are reachable from the front door: the circus and
+        // the ministry of rumours are endings people can actually arrive at.
+        func reaches(_ target: String) -> Bool {
+            var seen: Set<String> = []
+            var queue = [Defector.startID]
+            while let id = queue.popLast() {
+                guard seen.insert(id).inserted else { continue }
+                if id == target { return true }
+                queue.append(contentsOf: Defector.nodes[id]?.choices.map(\.nextId) ?? [])
+            }
+            return false
+        }
+        #expect(reaches("circus"), "the trapeze awaits the reliable")
+        #expect(reaches("rumour"), "the rumour ministry keeps an opening")
     }
 
     // MARK: - Radio Moscow (directive 9)
