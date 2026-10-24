@@ -15,17 +15,24 @@ struct ReportFormView: View {
 
     @State private var offence: String?
     @State private var details = ""
-    @State private var informantName = "Comrade Operator"
+    @State private var informantName =
+        StateStore.shared.profile()?.alias ?? "Comrade Operator"
 
-    private static let offences = [
-        "Hoarding Western jokes",
-        "Insufficient enthusiasm at May Day",
-        "Listening to enemy radio",
-        "Joking about rationing",
-        "Suspicious silence",
-        "Keeping an unregistered cat",
-        "Other",
-    ]
+    /// A crime recognised by the People's Tribunal.
+    struct Offence: Identifiable, Equatable {
+        let title: String
+        var id: String { title }
+
+        static let all: [Offence] = [
+            Offence(title: "Hoarding Western jokes"),
+            Offence(title: "Insufficient enthusiasm at May Day"),
+            Offence(title: "Listening to enemy radio"),
+            Offence(title: "Joking about rationing"),
+            Offence(title: "Suspicious silence"),
+            Offence(title: "Keeping an unregistered cat"),
+            Offence(title: "Other"),
+        ]
+    }
 
     var body: some View {
         NavigationStack {
@@ -33,8 +40,8 @@ struct ReportFormView: View {
                 Section("Accusation") {
                     Picker("Offence", selection: $offence) {
                         Text("Select offence…").tag(nil as String?)
-                        ForEach(Self.offences, id: \.self) { candidate in
-                            Text(candidate).tag(candidate as String?)
+                        ForEach(Offence.all) { candidate in
+                            Text(candidate.title).tag(candidate.title as String?)
                         }
                     }
                     TextField(

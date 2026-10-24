@@ -45,6 +45,24 @@ struct MinistryTests {
         #expect(TrustEnforcement.score(for: clean) == 100)
     }
 
+    @Test("trustFlux lifts and sinks the deterministic score, still clamped")
+    func trustFluxMovesScore() {
+        var fluxed = Citizen(name: "Flux Kati", affiliation: "Railway Union", trustFlux: 30)
+        #expect(TrustEnforcement.score(for: fluxed) == 100, "the ceiling holds even for favourites")
+        fluxed.reportCount = 3
+        #expect(TrustEnforcement.score(for: fluxed) == 85)  // 100 − 45 + 30
+
+        let falling = Citizen(
+            name: "Falling Feri", affiliation: "Intellectual (regrettable)",
+            trustFlux: -20, reportCount: 5)
+        #expect(TrustEnforcement.score(for: falling) == 5)  // 100 − 75 − 20
+
+        let doomed = Citizen(
+            name: "Doomed Dénes", affiliation: "Lumpenproletariat",
+            trustFlux: -50, reportCount: 5)
+        #expect(TrustEnforcement.score(for: doomed) == 0, "the floor is the floor")
+    }
+
     @Test("Low trust overturns a clearance but never a neutralization")
     func enforceOverridesCleared() {
         let store = makeStore()
@@ -157,36 +175,91 @@ struct MinistryTests {
 
     // MARK: - Leaderboard (directive 4)
 
-    @Test("Leaderboard orders by reports, ties alphabetical, badges exact")
+    @Test("Leaderboard ranks net vigilance, ties alphabetical, YOU row included")
     func leaderboardOrdering() {
-        func filed(_ informant: String, count: Int) -> [Report] {
+        func filed(
+            _ informant: String, against victim: String? = nil, count: Int
+        ) -> [Report] {
             (0..<count).map { _ in
                 Report(
+                    targetName: victim,
                     offence: "Suspicious silence",
                     details: "Quiet as a subversion manual.",
                     informantName: informant)
             }
         }
-        var reports = filed("Amanuensis Alice", count: 3) + filed("Brave Boris", count: 5)
+        // Boris files 5 and suffers 2 → net 3 → Order of the Red Star.
+        var reports = filed("Brave Boris", count: 5)
+        reports += filed("Sneaky Stella", against: "Brave Boris", count: 2)
+        // Alice files 3 against nobody → net 3 → tie with Boris, settles alphabetically.
+        reports += filed("Amanuensis Alice", count: 3)
 
-        let entries = Leaderboard.entries(from: reports)
-        #expect(entries.map(\.name) == ["Brave Boris", "Amanuensis Alice"])
-        #expect(entries[0].reportCount == 5)
-        #expect(entries[0].badge == "Iron Neighbour")
-        #expect(entries[1].badge == "Order of the Red Star")
-
-        // Tie settles alphabetically.
-        reports += filed("Cautious Carla", count: 3)
-        let tied = Leaderboard.entries(from: reports)
-        #expect(tied.map(\.name) == ["Brave Boris", "Amanuensis Alice", "Cautious Carla"])
+        let entries = Leaderboard.entries(from: reports, profileAlias: "Sparrow")
+        #expect(
+            entries.map(\.name)
+                == ["Amanuensis Alice", "Brave Boris", "Sneaky Stella", "Sparrow"])
+        let boris = entries[1]
+        #expect(boris.filed == 5)
+        #expect(boris.received == 2)
+        #expect(boris.net == 3)
+        #expect(boris.badge == "Order of the Red Star")
+        #expect(entries[0].badge == "Order of the Red Star")
+        let stella = entries[2]
+        #expect(stella.filed == 2)
+        #expect(stella.received == 0)
+        #expect(stella.badge == "Loyal Ear")
+        let you = entries.last
+        #expect(you?.isYou == true)
+        #expect(you?.name == "Sparrow")
+        #expect(you?.filed == 0)
+        #expect(you?.received == 0)
     }
 
-    @Test("Badge thresholds flip at 1, 3, 5, 10")
+    @Test("Net badges flip at 3, 5, 10; denunciations against you demote visibly")
     func badgeThresholds() {
-        #expect(LeaderboardEntry(name: "X", reportCount: 1).badge == "Loyal Ear")
-        #expect(LeaderboardEntry(name: "X", reportCount: 3).badge == "Order of the Red Star")
-        #expect(LeaderboardEntry(name: "X", reportCount: 5).badge == "Iron Neighbour")
-        #expect(LeaderboardEntry(name: "X", reportCount: 10).badge == "People's Antenna")
+        #expect(LeaderboardEntry(name: "X", filed: 1, received: 0).badge == "Loyal Ear")
+        #expect(
+            LeaderboardEntry(name: "X", filed: 3, received: 0).badge == "Order of the Red Star")
+        #expect(LeaderboardEntry(name: "X", filed: 5, received: 0).badge == "Iron Neighbour")
+        #expect(LeaderboardEntry(name: "X", filed: 10, received: 0).badge == "People's Antenna")
+        // Ten filed against you drags a People's Antenna down to Loyal Ear.
+        #expect(LeaderboardEntry(name: "X", filed: 10, received: 10).badge == "Loyal Ear")
+        #expect(LeaderboardEntry(name: "X", filed: 13, received: 8).badge == "Iron Neighbour")
+        #expect(LeaderboardEntry(name: "X", filed: 1, received: 9).badge == "Loyal Ear")
+    }
+
+    @Test("The comrade is ranked as a YOU row with their own filed and received")
+    func youRow() {
+        let reports = [
+            Report(
+                targetName: "Sparrow", offence: "Suspicious silence",
+                informantName: "Nagy Pál"),
+            Report(
+                targetName: "Someone Else", offence: "Suspicious silence",
+                informantName: "Sparrow"),
+            Report(
+                targetName: "Someone Else", offence: "Suspicious silence",
+                informantName: "Sparrow"),
+        ]
+        let entries = Leaderboard.entries(from: reports, profileAlias: "Sparrow")
+        #expect(entries.filter { $0.name == "Sparrow" }.count == 1)
+        let you = entries.first { $0.isYou }
+        #expect(you?.filed == 2)
+        #expect(you?.received == 1)
+        #expect(you?.net == 1)
+        #expect(entries.first { $0.name == "Nagy Pál" }?.badge == "Loyal Ear")
+    }
+
+    @Test("Reports against dossiers resolve the victim from the citizen table")
+    func victimResolvesFromCitizenId() {
+        let reports = [
+            Report(citizenId: 7, offence: "Whistling in four tones", informantName: "Nagy Pál")
+        ]
+        let entries = Leaderboard.entries(
+            from: reports, profileAlias: nil, citizenNames: [7: "Kovács Géza"])
+        #expect(entries.first { $0.name == "Kovács Géza" }?.received == 1)
+        #expect(entries.first { $0.name == "Nagy Pál" }?.filed == 1)
+        #expect(entries.allSatisfy { !$0.isYou }, "no alias, no YOU row")
     }
 
     // MARK: - Five-Year Plan (directive 6)

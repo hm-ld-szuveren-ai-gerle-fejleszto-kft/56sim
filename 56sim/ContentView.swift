@@ -13,6 +13,7 @@ import UniformTypeIdentifiers
 /// Until a comrade is enrolled, the whole republic is a setup wizard.
 struct ContentView: View {
     @State private var store = StateStore.shared
+    @State private var simulator = PeopleSimulator.shared
 
     @State private var selectedCitizenId: Int64?
     @State private var isAddingCitizen = false
@@ -148,6 +149,29 @@ struct ContentView: View {
                     try? await Task.sleep(for: .seconds(Int.random(in: 4...9)))
                     if Double.random(in: 0..<1) < 0.4 {
                         StateHaptics.shared.play(.strayBullet)
+                    }
+                }
+            }
+            .task {
+                // The republic lives between bullets: one weighted event per tick.
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(5))
+                    simulator.advance(now: .now)
+                }
+            }
+            .safeAreaInset(edge: .top, alignment: .leading) {
+                VStack(alignment: .leading, spacing: 6) {
+                    if simulator.playerDenouncedBy != nil {
+                        banner(
+                            "You have been denounced! The queue for your defence is forming.",
+                            tint: .red
+                        ) { simulator.playerDenouncedBy = nil }
+                    }
+                    if let lastEvent = simulator.lastEvent {
+                        Text(lastEvent)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal)
                     }
                 }
             }

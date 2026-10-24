@@ -1,6 +1,6 @@
 # 56sim — Manual Test Checklist
 
-All 28 unit tests pass (`** TEST SUCCEEDED **`). This file is the on-device verification list.
+All unit tests pass (`** TEST SUCCEEDED **`). This file is the on-device verification list.
 
 ## Build for the iPhone 16e
 
@@ -26,7 +26,7 @@ xcrun devicectl device install app --device <YOUR-16E-UDID> \
 - Open the citizen. Trust gauge reads **90** (note −10), green, status "Under Surveillance".
 - **Report a Colleague** → pick "Listening to enemy radio", fill details → File Report.
 - Gauge drops **−15 per report** (75 after one report + note); the denunciation appears under
-  "Denunciations" with offence, details, "Filed by Comrade Operator on …".
+  "Denunciations" with offence, details, "Filed by <your alias> on …".
 
 ### 2. Ministry of Records + checkpoint
 
@@ -46,8 +46,11 @@ found)", 5 quotas with progress bars (informants show 1/10,000 after step 1; ban
 
 ### 4. Leaderboard
 
-Ministry → Neighbour-Watch. Informant name with "Loyal Ear" badge
-(≥3 = Order of the Red Star, ≥5 = Iron Neighbour, ≥10 = People's Antenna). Test the ShareLink.
+Ministry → Neighbour-Watch. Every rank is net vigilance: **"+filed/−received"**.
+Badges read the **net** (≥3 = Order of the Red Star, ≥5 = Iron Neighbour,
+≥10 = People's Antenna, below 3 = Loyal Ear), so denunciations filed against
+someone visibly demote them. Your own comrade appears once, sorted by net, with
+a red **YOU** capsule. Test the ShareLink.
 
 ### 5. Defector
 
@@ -91,5 +94,17 @@ with the PNG poster.
 Opt-in integration test gated on `LLM_INTEGRATION=YES` in `PeopleRegistryTests` loads
 `LiquidAI/LFM2.5-1.2B-Instruct-MLX-4bit` and asserts a non-empty response. Real proof is
 step 9 on the phone.
+
+### 11. Living world (PeopleSimulator)
+
+- Leave the dashboard open ~1 min: a grey caption under the toolbar updates with
+  simulated history ("… denounced …", "A note appeared in …'s file.",
+  "The Authority reclassified …").
+- Every ~15 s the state rolls the dice; ~10% of rolls denounce **you**: a red
+  "You have been denounced! The queue for your defence is forming." banner with
+  **Dismiss**, a report against your alias on the leaderboard (−1 on your row),
+  a stray-bullet haptic, and a `player` row in the Archive.
+- All simulated rows land in Ministry → The Archive of the People as `simulator`
+  (your denunciation as `player`).
 
 If anything misbehaves, report the numbered step and what was observed.
