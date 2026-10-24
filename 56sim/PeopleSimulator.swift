@@ -116,13 +116,13 @@ final class PeopleSimulator {
             targetName = citizens[j].name
         }
         let offence = anOffence()
-        let text = "\(informant) denounced \(targetName): \(offence)."
+        let text = "\(informant) denounced \(targetName): \(offence.title)."
         store.addReport(
             citizenId: target?.id,
             targetName: targetName,
-            offence: offence,
-            category: "Unclassified",
-            severity: "Watchlist",
+            offence: offence.title,
+            category: offence.category.rawValue,
+            severity: offence.severity.rawValue,
             details: "Overheard by the People.",
             informantName: informant
         )
@@ -180,9 +180,9 @@ final class PeopleSimulator {
         store.addReport(
             citizenId: nil,
             targetName: profile.alias,
-            offence: offence,
-            category: "Unclassified",
-            severity: "Watchlist",
+            offence: offence.title,
+            category: offence.category.rawValue,
+            severity: offence.severity.rawValue,
             details: "Filed anonymously, signed loudly.",
             informantName: informant
         )
@@ -194,9 +194,9 @@ final class PeopleSimulator {
 
     // MARK: - Drawing lots
 
-    private func anOffence() -> String {
+    private func anOffence() -> ReportFormView.Offence {
         let all = ReportFormView.Offence.all
-        return all[drawIndex(for: all.count)].title
+        return all[drawIndex(for: all.count)]
     }
 
     private func drawIndex(for count: Int) -> Int {

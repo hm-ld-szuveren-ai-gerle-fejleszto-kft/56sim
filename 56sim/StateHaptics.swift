@@ -3,7 +3,8 @@
 //  56sim
 //
 //  The Sound of the State, felt not heard: stray bullets, T-34 main guns,
-//  and tanks rumbling past while you pretend not to exist.
+//  and tanks rumbling past while you pretend not to exist. Maxed, as the
+//  people demanded.
 //
 
 import CoreHaptics
@@ -21,7 +22,20 @@ enum HapticPatterns {
     static func events(for cue: HapticCue) -> [CHHapticEvent] {
         switch cue {
         case .strayBullet:
-            // A single crack from somewhere you hope is far away.
+            // Three cracks from somewhere you hope is far away.
+            return [0, 0.05, 0.10].map { time in
+                CHHapticEvent(
+                    eventType: .hapticTransient,
+                    parameters: [
+                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0),
+                    ],
+                    relativeTime: time,
+                    duration: 0.02
+                )
+            }
+        case .t34Firing:
+            // The main gun, its concussive tail, and the roll of the street.
             return [
                 CHHapticEvent(
                     eventType: .hapticTransient,
@@ -29,39 +43,37 @@ enum HapticPatterns {
                         CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
                         CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0),
                     ],
-                    relativeTime: 0
-                )
-            ]
-        case .t34Firing:
-            // The main gun, then the concussive tail rolling down the street.
-            return [
-                CHHapticEvent(
-                    eventType: .hapticTransient,
-                    parameters: [
-                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
-                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.35),
-                    ],
                     relativeTime: 0,
                     duration: 0.25
                 ),
                 CHHapticEvent(
                     eventType: .hapticTransient,
                     parameters: [
-                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.6),
-                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.1),
+                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.9),
+                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.6),
                     ],
-                    relativeTime: 0.25,
-                    duration: 0.6
+                    relativeTime: 0.05,
+                    duration: 0.7
+                ),
+                CHHapticEvent(
+                    eventType: .hapticContinuous,
+                    parameters: [
+                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.85),
+                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.3),
+                    ],
+                    relativeTime: 0.15,
+                    duration: 1.0
                 ),
             ]
         case .tankRumble:
-            // One long continuous growl; the curve does the swell and fade.
+            // One long continuous growl at full intensity; the curve does
+            // the swell and fade.
             return [
                 CHHapticEvent(
                     eventType: .hapticContinuous,
                     parameters: [
-                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.5),
-                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.1),
+                        CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                        CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0),
                     ],
                     relativeTime: 0,
                     duration: 5
@@ -73,14 +85,16 @@ enum HapticPatterns {
     /// Pattern-level intensity modulation. Only the tanks get a curve.
     static func curves(for cue: HapticCue) -> [CHHapticParameterCurve] {
         guard cue == .tankRumble else { return [] }
-        // Approaching, passing, receding: swell and fade over five seconds.
+        // Approaching, passing, passing again, receding: four points of
+        // armour rolling over five seconds.
         return [
             CHHapticParameterCurve(
                 parameterID: .hapticIntensityControl,
                 controlPoints: [
-                    CHHapticParameterCurve.ControlPoint(relativeTime: 0, value: 0.1),
-                    CHHapticParameterCurve.ControlPoint(relativeTime: 2.5, value: 0.9),
-                    CHHapticParameterCurve.ControlPoint(relativeTime: 5, value: 0.1),
+                    CHHapticParameterCurve.ControlPoint(relativeTime: 0, value: 0.4),
+                    CHHapticParameterCurve.ControlPoint(relativeTime: 1, value: 1.0),
+                    CHHapticParameterCurve.ControlPoint(relativeTime: 3.5, value: 1.0),
+                    CHHapticParameterCurve.ControlPoint(relativeTime: 5, value: 0.4),
                 ],
                 relativeTime: 0
             )
@@ -93,6 +107,10 @@ final class StateHaptics: @unchecked Sendable {
     static let shared = StateHaptics()
 
     private static let mutedKey = "stateHapticsMuted"
+
+    /// Optional witness for the Ministry's inspectors: every cue the state
+    /// intends to fire passes through here before the hardware decides.
+    var recorder: ((HapticCue) -> Void)?
 
     private(set) var muted: Bool
     private lazy var engine: CHHapticEngine? = {
@@ -112,6 +130,7 @@ final class StateHaptics: @unchecked Sendable {
 
     func play(_ cue: HapticCue) {
         guard !muted else { return }
+        recorder?(cue)
         if let engine {
             do {
                 let pattern = try CHHapticPattern(
