@@ -10,13 +10,15 @@ import Foundation
 
 struct TrustEnforcement {
     /// Deterministic loyalty score. Base 100; −15 per denunciation; −10 if a
-    /// dossier note exists; floor 0, cap 100.
+    /// dossier note exists; + the volatile `trustFlux` the simulator drifts;
+    /// floor 0, cap 100.
     static func score(for citizen: Citizen) -> Int {
         var score = 100
         score -= 15 * citizen.reportCount
         if !citizen.dossierNote.isEmpty {
             score -= 10
         }
+        score += citizen.trustFlux
         return min(100, max(0, score))
     }
 
