@@ -5,11 +5,10 @@
 //  Intake form for filing a new citizen dossier.
 //
 
-import SwiftData
 import SwiftUI
 
 struct AddCitizenView: View {
-    @Environment(\.modelContext) private var modelContext
+    @State private var store = StateStore.shared
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
@@ -57,17 +56,22 @@ struct AddCitizenView: View {
     private func fileReport() {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedAffiliation = affiliation.trimmingCharacters(in: .whitespacesAndNewlines)
-        let citizen = Citizen(
+        let affiliation = trimmedAffiliation.isEmpty ? "Undocumented element" : trimmedAffiliation
+        store.addCitizen(
             name: trimmedName,
-            affiliation: trimmedAffiliation.isEmpty ? "Undocumented element" : trimmedAffiliation,
+            affiliation: affiliation,
             dossierNote: dossierNote.trimmingCharacters(in: .whitespacesAndNewlines)
         )
-        modelContext.insert(citizen)
+        store.log(
+            kind: .citizen,
+            actor: store.profile()?.alias ?? "The Registry",
+            subject: trimmedName,
+            text: "Dossier opened on \(trimmedName), \(affiliation)."
+        )
         dismiss()
     }
 }
 
 #Preview {
     AddCitizenView()
-        .modelContainer(for: [Citizen.self, Broadcast.self], inMemory: true)
 }

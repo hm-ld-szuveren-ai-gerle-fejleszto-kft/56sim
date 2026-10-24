@@ -6,23 +6,26 @@
 //  the arithmetic merely catches up later.
 //
 
-import SwiftData
+import Foundation
 import SwiftUI
 
 struct PlanView: View {
-    @Query private var citizens: [Citizen]
-    @Query private var broadcasts: [Broadcast]
-    @Query private var allReports: [Report]
+    @State private var store = StateStore.shared
+
+    private var counts: (citizens: Int, broadcasts: Int, reports: [Report]) {
+        _ = store.revision
+        return (store.citizens().count, store.broadcasts().count, store.reports())
+    }
 
     var body: some View {
-        let informants = Set(allReports.map(\.informantName)).count
+        let informants = Set(counts.reports.map(\.informantName)).count
         let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: .now) ?? 1
         let progresses = FiveYearPlan.quotas.map {
             FiveYearPlan.progress(
                 for: $0,
                 informants: informants,
-                dossiers: citizens.count,
-                broadcasts: broadcasts.count,
+                dossiers: counts.citizens,
+                broadcasts: counts.broadcasts,
                 dayOfYear: dayOfYear
             )
         }
@@ -44,7 +47,7 @@ struct PlanView: View {
                             .font(.headline)
                         ProgressView(value: progresses[index])
                         Text(
-                            "\(FiveYearPlan.rawCount(for: quota, informants: informants, dossiers: citizens.count, broadcasts: broadcasts.count, dayOfYear: dayOfYear)) / \(quota.target) \(quota.unit)"
+                            "\(FiveYearPlan.rawCount(for: quota, informants: informants, dossiers: counts.citizens, broadcasts: counts.broadcasts, dayOfYear: dayOfYear)) / \(quota.target) \(quota.unit)"
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)

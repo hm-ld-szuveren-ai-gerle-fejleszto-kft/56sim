@@ -5,13 +5,12 @@
 //  The Denunciation Hotline: your neighbour is talking, and so should you.
 //
 
-import SwiftData
 import SwiftUI
 
 struct ReportFormView: View {
     let citizen: Citizen
 
-    @Environment(\.modelContext) private var modelContext
+    @State private var store = StateStore.shared
     @Environment(\.dismiss) private var dismiss
 
     @State private var offence: String?
@@ -74,13 +73,27 @@ struct ReportFormView: View {
 
     private func save() {
         guard let offence else { return }
-        let report = Report(
+        let informant = informantName.trimmingCharacters(in: .whitespacesAndNewlines)
+        store.addReport(
+            citizenId: citizen.id,
+            targetName: citizen.name,
             offence: offence,
+            category: "Unclassified",
+            severity: "Watchlist",
             details: details.trimmingCharacters(in: .whitespacesAndNewlines),
-            informantName: informantName.trimmingCharacters(in: .whitespacesAndNewlines),
-            citizen: citizen
+            informantName: informant
         )
-        modelContext.insert(report)
-        TrustEnforcement.enforce(citizen)
+        store.log(
+            kind: .report,
+            actor: informant,
+            subject: citizen.name,
+            text: "\(informant) denounced \(citizen.name): \(offence)."
+        )
+        TrustEnforcement.enforce(id: citizen.id)
     }
+}
+
+#Preview {
+    ReportFormView(
+        citizen: Citizen(id: 1, name: "Kovács Gyula", affiliation: "Factory #7"))
 }

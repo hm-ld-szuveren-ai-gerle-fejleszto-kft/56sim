@@ -32,6 +32,12 @@
     }, {
       "kind": "local",
       "path": "Vendor/piper-objc",
+    }, {
+      "kind": "remote",
+      "repository": "https://github.com/stephencelis/SQLite.swift",
+      "version": {
+        "up-to-next-minor-version": "0.16.0",
+      },
     },
   ],
   "files": [
@@ -75,6 +81,7 @@
         { "kind": "package", "package": "mlx-swift-lm", "product-name": "MLXHuggingFaceMacros", "product-type": "build-tool-plugin" },
         { "kind": "package", "package": "piper-objc", "product-name": "piper-player" },
         { "kind": "package", "package": "piper-objc", "product-name": "piper-objc" },
+        { "kind": "package", "package": "SQLite", "product-name": "SQLite" },
       ],
       "build-phases": [
         "compile-sources",
@@ -109,6 +116,10 @@
         }, {
           "package": "swift-transformers",
           "product-name": "Tokenizers",
+          "build-phase": { "build-phase": "frameworks" },
+        }, {
+          "package": "SQLite",
+          "product-name": "SQLite",
           "build-phase": { "build-phase": "frameworks" },
         },
       ],
