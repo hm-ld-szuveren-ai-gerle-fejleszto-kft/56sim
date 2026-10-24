@@ -6,7 +6,7 @@
 //  occasionally announcing the weather as a political victory.
 //
 
-import SwiftData
+import Foundation
 import SwiftUI
 
 enum RadioMoscow {
@@ -85,10 +85,15 @@ enum RadioMoscow {
 }
 
 struct RadioMoscowView: View {
-    @Query(sort: \Broadcast.postedAt, order: .reverse) private var broadcasts: [Broadcast]
+    @State private var store = StateStore.shared
 
     @State private var announcer = PiperAnnouncer.shared
     @State private var tickerIndex = 0
+
+    private var broadcasts: [Broadcast] {
+        _ = store.revision
+        return store.broadcasts()
+    }
 
     private var extraTitles: [String] { broadcasts.map(\.title) }
 

@@ -8,16 +8,14 @@
 //
 
 import Foundation
-import SwiftData
 import Testing
 
 @testable import _6sim
 
-private func makeRegistry() throws -> ModelContext {
-    let schema = Schema([Citizen.self, Broadcast.self, Report.self, RecordAmendment.self])
-    let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-    let container = try ModelContainer(for: schema, configurations: [configuration])
-    return ModelContext(container)
+private func makeStore() -> StateStore {
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("56sim-tests-\(UUID().uuidString)", isDirectory: true)
+    return StateStore(url: directory.appendingPathComponent("state.sqlite"))
 }
 
 @MainActor
@@ -25,21 +23,11 @@ struct MinistryTests {
     // MARK: - Trust-o-meter (directive 2)
 
     @Test("Five denunciations drop trust to 25; none keep it at 100")
-    func trustScore() throws {
-        let context = try makeRegistry()
-        let citizen = Citizen(name: "Kovács Gyula", affiliation: "Factory worker")
-        context.insert(citizen)
+    func trustScore() {
+        var citizen = Citizen(name: "Kovács Gyula", affiliation: "Factory worker")
         #expect(TrustEnforcement.score(for: citizen) == 100)
 
-        for _ in 0..<5 {
-            context.insert(
-                Report(
-                    offence: "Hoarding Western jokes",
-                    details: "Told one at the canteen.",
-                    informantName: "Comrade Operator",
-                    citizen: citizen
-                ))
-        }
+        citizen.reportCount = 5
         #expect(TrustEnforcement.score(for: citizen) == 25)
 
         // Dossier note costs another 10.
@@ -48,100 +36,96 @@ struct MinistryTests {
     }
 
     @Test("Trust is clamped to 0...100")
-    func trustClamps() throws {
-        let context = try makeRegistry()
-        let citizen = Citizen(name: "Nagy Éva", affiliation: "Student")
-        context.insert(citizen)
-        for _ in 0..<20 {
-            context.insert(
-                Report(
-                    offence: "Suspicious silence",
-                    details: "Said nothing, three days running.",
-                    informantName: "Comrade Operator",
-                    citizen: citizen
-                ))
-        }
-        #expect(TrustEnforcement.score(for: citizen) == 0)
+    func trustClamps() {
+        let accused = Citizen(
+            name: "Nagy Éva", affiliation: "Student", reportCount: 20)
+        #expect(TrustEnforcement.score(for: accused) == 0)
 
         let clean = Citizen(name: "Szabó Béla", affiliation: "Clerk")
-        context.insert(clean)
         #expect(TrustEnforcement.score(for: clean) == 100)
     }
 
     @Test("Low trust overturns a clearance but never a neutralization")
-    func enforceOverridesCleared() throws {
-        let context = try makeRegistry()
-        let cleared = Citizen(name: "Horváth János", affiliation: "Trader", status: .cleared)
-        context.insert(cleared)
-        for _ in 0..<5 {
-            context.insert(
-                Report(
-                    offence: "Listening to enemy radio",
-                    details: "Antenna pointed west.",
-                    informantName: "Comrade Operator",
-                    citizen: cleared
-                ))
+    func enforceOverridesCleared() {
+        let store = makeStore()
+        let clearedId = store.addCitizen(
+            name: "Horváth János", affiliation: "Trader", dossierNote: "")
+        if var cleared = store.citizen(id: clearedId) {
+            cleared.status = .cleared
+            store.setCitizen(cleared)
         }
-        #expect(TrustEnforcement.score(for: cleared) == 25)
-        TrustEnforcement.enforce(cleared)
-        #expect(cleared.status == .surveilled)
+        for _ in 0..<5 {
+            store.addReport(
+                citizenId: clearedId, targetName: "Horváth János",
+                offence: "Listening to enemy radio", category: "musical",
+                severity: "consultancy", details: "Antenna pointed west.",
+                informantName: "Comrade Operator")
+        }
+        #expect(TrustEnforcement.score(for: store.citizen(id: clearedId)!) == 25)
+        TrustEnforcement.enforce(id: clearedId, store: store)
+        #expect(store.citizen(id: clearedId)?.status == .surveilled)
 
-        let neutralized = Citizen(
-            name: "Tóth Kálmán", affiliation: "Engineer", status: .neutralized)
-        context.insert(neutralized)
-        for _ in 0..<5 {
-            context.insert(
-                Report(
-                    offence: "Joking about rationing",
-                    details: "A banana joke. Not funny. Political.",
-                    informantName: "Comrade Operator",
-                    citizen: neutralized
-                ))
+        let neutralizedId = store.addCitizen(
+            name: "Tóth Kálmán", affiliation: "Engineer", dossierNote: "")
+        if var neutralized = store.citizen(id: neutralizedId) {
+            neutralized.status = .neutralized
+            store.setCitizen(neutralized)
         }
-        TrustEnforcement.enforce(neutralized)
-        #expect(neutralized.status == .neutralized, "the dead are beyond reclassification")
+        for _ in 0..<5 {
+            store.addReport(
+                citizenId: neutralizedId, targetName: "Tóth Kálmán",
+                offence: "Joking about rationing", category: "verbal",
+                severity: "reeducation", details: "A banana joke. Not funny. Political.",
+                informantName: "Comrade Operator")
+        }
+        TrustEnforcement.enforce(id: neutralizedId, store: store)
+        #expect(
+            store.citizen(id: neutralizedId)?.status == .neutralized,
+            "the dead are beyond reclassification")
     }
 
     // MARK: - Ministry of Records (directive 3)
 
     @Test("Amendments rotate justifications by count and apply the change")
-    func amendmentRotation() throws {
-        let context = try makeRegistry()
-        let citizen = Citizen(name: "Kiss Ferenc", affiliation: "Tailor")
-        context.insert(citizen)
+    func amendmentRotation() {
+        let store = makeStore()
+        let citizenId = store.addCitizen(name: "Kiss Ferenc", affiliation: "Tailor", dossierNote: "")
 
         RecordOffice.amend(
-            citizen, field: "status",
+            citizenId: citizenId, field: "status",
             old: CitizenStatus.surveilled.propagandaLabel,
             new: CitizenStatus.cleared.propagandaLabel,
-            in: context
+            store: store
         )
-        #expect(citizen.status == .cleared)
-        #expect(citizen.amendments.count == 1)
-        #expect(citizen.amendments[0].justification == RecordOffice.justifications[0])
-        #expect(citizen.amendments[0].fieldName == "status")
+        #expect(store.citizen(id: citizenId)?.status == .cleared)
+        var amendments = store.amendments(citizenId: citizenId)
+        #expect(amendments.count == 1)
+        #expect(amendments[0].justification == RecordOffice.justifications[0])
+        #expect(amendments[0].fieldName == "status")
 
         RecordOffice.amend(
-            citizen, field: "status",
+            citizenId: citizenId, field: "status",
             old: CitizenStatus.cleared.propagandaLabel,
             new: CitizenStatus.neutralized.propagandaLabel,
-            in: context
+            store: store
         )
-        #expect(citizen.status == .neutralized)
-        #expect(citizen.amendments.count == 2)
-        #expect(citizen.amendments[1].justification == RecordOffice.justifications[1])
+        #expect(store.citizen(id: citizenId)?.status == .neutralized)
+        amendments = store.amendments(citizenId: citizenId)
+        #expect(amendments.count == 2)
+        #expect(amendments[1].justification == RecordOffice.justifications[1])
 
         // Rotation wraps at 5.
         for index in 2..<7 {
             let next = CitizenStatus.allCases[index % 3]
             RecordOffice.amend(
-                citizen, field: "status",
-                old: citizen.status.propagandaLabel,
+                citizenId: citizenId, field: "status",
+                old: store.citizen(id: citizenId)?.status.propagandaLabel ?? "",
                 new: next.propagandaLabel,
-                in: context
+                store: store
             )
+            amendments = store.amendments(citizenId: citizenId)
             #expect(
-                citizen.amendments[index].justification == RecordOffice.justifications[index % 5])
+                amendments[index].justification == RecordOffice.justifications[index % 5])
         }
     }
 
@@ -155,51 +139,45 @@ struct MinistryTests {
     }
 
     @Test("Amendment history sorts newest first")
-    func amendmentHistoryOrder() throws {
-        let context = try makeRegistry()
-        let citizen = Citizen(name: "Varga István", affiliation: "Driver")
-        context.insert(citizen)
+    func amendmentHistoryOrder() {
+        let store = makeStore()
+        let citizenId = store.addCitizen(name: "Varga István", affiliation: "Driver", dossierNote: "")
         RecordOffice.amend(
-            citizen, field: "status", old: "A", new: CitizenStatus.cleared.propagandaLabel,
-            in: context)
+            citizenId: citizenId, field: "status", old: "A",
+            new: CitizenStatus.cleared.propagandaLabel, store: store)
         RecordOffice.amend(
-            citizen, field: "status", old: CitizenStatus.cleared.propagandaLabel,
-            new: CitizenStatus.surveilled.propagandaLabel, in: context)
-        let newestFirst = citizen.amendments.sorted { $0.amendedAt > $1.amendedAt }
+            citizenId: citizenId, field: "status",
+            old: CitizenStatus.cleared.propagandaLabel,
+            new: CitizenStatus.surveilled.propagandaLabel, store: store)
+        let newestFirst = store.amendments(citizenId: citizenId).sorted {
+            $0.amendedAt > $1.amendedAt
+        }
         #expect(newestFirst.first?.newValue == CitizenStatus.surveilled.propagandaLabel)
     }
 
     // MARK: - Leaderboard (directive 4)
 
     @Test("Leaderboard orders by reports, ties alphabetical, badges exact")
-    func leaderboardOrdering() throws {
-        let context = try makeRegistry()
-        let citizen = Citizen(name: "Németh Lászlóné", affiliation: "Librarian")
-        context.insert(citizen)
-
-        func file(_ informant: String, count: Int) {
-            for _ in 0..<count {
-                context.insert(
-                    Report(
-                        offence: "Suspicious silence",
-                        details: "Quiet as a subversion manual.",
-                        informantName: informant,
-                        citizen: citizen
-                    ))
+    func leaderboardOrdering() {
+        func filed(_ informant: String, count: Int) -> [Report] {
+            (0..<count).map { _ in
+                Report(
+                    offence: "Suspicious silence",
+                    details: "Quiet as a subversion manual.",
+                    informantName: informant)
             }
         }
-        file("Amanuensis Alice", count: 3)
-        file("Brave Boris", count: 5)
+        var reports = filed("Amanuensis Alice", count: 3) + filed("Brave Boris", count: 5)
 
-        let entries = Leaderboard.entries(from: citizen.reports)
+        let entries = Leaderboard.entries(from: reports)
         #expect(entries.map(\.name) == ["Brave Boris", "Amanuensis Alice"])
         #expect(entries[0].reportCount == 5)
         #expect(entries[0].badge == "Iron Neighbour")
         #expect(entries[1].badge == "Order of the Red Star")
 
         // Tie settles alphabetically.
-        file("Cautious Carla", count: 3)
-        let tied = Leaderboard.entries(from: citizen.reports)
+        reports += filed("Cautious Carla", count: 3)
+        let tied = Leaderboard.entries(from: reports)
         #expect(tied.map(\.name) == ["Brave Boris", "Amanuensis Alice", "Cautious Carla"])
     }
 

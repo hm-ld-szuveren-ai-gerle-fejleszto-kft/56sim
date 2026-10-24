@@ -5,15 +5,18 @@
 //  State broadcast feed shown when no dossier is selected.
 //
 
-import SwiftData
 import SwiftUI
 
 struct BroadcastView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Broadcast.postedAt, order: .reverse) private var broadcasts: [Broadcast]
+    @State private var store = StateStore.shared
 
     @State private var isIssuingBroadcast = false
     @State private var gate = CheckpointGateRunner()
+
+    private var broadcasts: [Broadcast] {
+        _ = store.revision
+        return store.broadcasts()
+    }
 
     var body: some View {
         List {
@@ -60,16 +63,14 @@ struct BroadcastView: View {
 
     private func deleteBroadcasts(offsets: IndexSet) {
         withAnimation {
-            for index in offsets {
-                modelContext.delete(broadcasts[index])
-            }
+            store.deleteBroadcasts(ids: offsets.map { broadcasts[$0].id })
         }
     }
 }
 
 /// Intake form for issuing a new state directive.
 private struct AddBroadcastView: View {
-    @Environment(\.modelContext) private var modelContext
+    @State private var store = StateStore.shared
     @Environment(\.dismiss) private var dismiss
 
     @State private var title = ""
@@ -107,11 +108,17 @@ private struct AddBroadcastView: View {
     }
 
     private func issueBroadcast() {
-        let broadcast = Broadcast(
-            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+        let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        store.addBroadcast(
+            title: title,
             body: proclamation.trimmingCharacters(in: .whitespacesAndNewlines)
         )
-        modelContext.insert(broadcast)
+        store.log(
+            kind: .broadcast,
+            actor: "The Ministry",
+            subject: title,
+            text: "\(title) proclaimed to the people."
+        )
         dismiss()
     }
 }
@@ -120,5 +127,4 @@ private struct AddBroadcastView: View {
     NavigationStack {
         BroadcastView()
     }
-    .modelContainer(for: [Citizen.self, Broadcast.self], inMemory: true)
 }

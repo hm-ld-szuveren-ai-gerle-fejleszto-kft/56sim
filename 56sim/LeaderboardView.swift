@@ -6,7 +6,7 @@
 //  where suspicion is due.
 //
 
-import SwiftData
+import Foundation
 import SwiftUI
 
 struct LeaderboardEntry: Identifiable {
@@ -40,7 +40,12 @@ enum Leaderboard {
 }
 
 struct LeaderboardView: View {
-    @Query private var allReports: [Report]
+    @State private var store = StateStore.shared
+
+    private var allReports: [Report] {
+        _ = store.revision
+        return store.reports()
+    }
 
     private var entries: [LeaderboardEntry] { Leaderboard.entries(from: allReports) }
 

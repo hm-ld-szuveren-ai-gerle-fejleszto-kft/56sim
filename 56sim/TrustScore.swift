@@ -13,7 +13,7 @@ struct TrustEnforcement {
     /// dossier note exists; floor 0, cap 100.
     static func score(for citizen: Citizen) -> Int {
         var score = 100
-        score -= 15 * citizen.reports.count
+        score -= 15 * citizen.reportCount
         if !citizen.dossierNote.isEmpty {
             score -= 10
         }
@@ -21,9 +21,13 @@ struct TrustEnforcement {
     }
 
     /// Below 30 → .surveilled overrides .cleared. Never touches .neutralized.
-    static func enforce(_ citizen: Citizen) {
+    /// Reads the freshest row from the archive and writes back only on a flip.
+    static func enforce(id: Int64, store: StateStore = .shared) {
+        guard let citizen = store.citizen(id: id) else { return }
         if score(for: citizen) < 30, citizen.status == .cleared {
-            citizen.status = .surveilled
+            var updated = citizen
+            updated.status = .surveilled
+            store.setCitizen(updated)
         }
     }
 }
