@@ -63,16 +63,17 @@ struct MinistryTests {
         #expect(TrustEnforcement.score(for: doomed) == 0, "the floor is the floor")
     }
 
-    @Test("Low trust overturns a clearance but never a neutralization")
+    @Test("Low trust surveils, five denunciations close the file, the dead stay dead")
     func enforceOverridesCleared() {
         let store = makeStore()
         let clearedId = store.addCitizen(
-            name: "Horváth János", affiliation: "Trader", dossierNote: "")
+            name: "Horváth János", affiliation: "Trader", dossierNote: "Antenna pointed west.")
         if var cleared = store.citizen(id: clearedId) {
             cleared.status = .cleared
+            cleared.trustFlux = -5
             store.setCitizen(cleared)
         }
-        for _ in 0..<5 {
+        for _ in 0..<4 {
             store.addReport(
                 citizenId: clearedId, targetName: "Horváth János",
                 offence: "Listening to enemy radio", category: "musical",
@@ -81,7 +82,27 @@ struct MinistryTests {
         }
         #expect(TrustEnforcement.score(for: store.citizen(id: clearedId)!) == 25)
         TrustEnforcement.enforce(id: clearedId, store: store)
-        #expect(store.citizen(id: clearedId)?.status == .surveilled)
+        #expect(
+            store.citizen(id: clearedId)?.status == .surveilled,
+            "low trust overturns a clearance but stops at surveillance")
+
+        let doomedId = store.addCitizen(
+            name: "Kiss Katalin", affiliation: "Tailor", dossierNote: "")
+        if var doomed = store.citizen(id: doomedId) {
+            doomed.status = .cleared
+            store.setCitizen(doomed)
+        }
+        for _ in 0..<5 {
+            store.addReport(
+                citizenId: doomedId, targetName: "Kiss Katalin",
+                offence: "Listening to enemy radio", category: "musical",
+                severity: "consultancy", details: "Antenna pointed west.",
+                informantName: "Comrade Operator")
+        }
+        TrustEnforcement.enforce(id: doomedId, store: store)
+        #expect(
+            store.citizen(id: doomedId)?.status == .neutralized,
+            "the fifth denunciation closes the file")
 
         let neutralizedId = store.addCitizen(
             name: "Tóth Kálmán", affiliation: "Engineer", dossierNote: "")
