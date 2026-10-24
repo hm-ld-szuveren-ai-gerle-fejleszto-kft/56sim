@@ -56,15 +56,17 @@ struct PeopleSimulatorTests {
 
     // MARK: - 0.35 — neighbour denounces neighbour
 
-    @Test("NPC denounces NPC: report filed, trust falls, clearance overturned, never neutralized")
+    @Test("NPC denounces NPC: report filed, trust falls, the fifth denunciation closes the file")
     func npcDenouncesNpc() {
         let store = makeSimulatorStore()
         seedProfile(store)
         // Added first ⇒ lands last in the newest-first registry list.
         let victimId = store.addCitizen(
             name: "Viktor Vulnerable", affiliation: "Railway Union", dossierNote: "")
-        store.addCitizen(name: "Dorottya Diligent", affiliation: "Collective Farm No. 3", dossierNote: "")
-        store.addCitizen(name: "Géza Garrulous", affiliation: "State Beekeeping Directorate", dossierNote: "")
+        store.addCitizen(
+            name: "Dorottya Diligent", affiliation: "Collective Farm No. 3", dossierNote: "")
+        store.addCitizen(
+            name: "Géza Garrulous", affiliation: "State Beekeeping Directorate", dossierNote: "")
         if var victim = store.citizen(id: victimId) {
             victim.status = .cleared
             store.setCitizen(victim)
@@ -97,14 +99,17 @@ struct PeopleSimulatorTests {
         let after = store.citizen(id: victimId)!
         #expect(after.reportCount == 5)
         #expect(TrustEnforcement.score(for: after) == 25)
-        #expect(after.status == .surveilled, "low trust overturns a clearance")
+        #expect(after.status == .neutralized, "the fifth denunciation closes the file")
 
         #expect(sim.lastEvent == "\(informant) denounced Viktor Vulnerable: \(offence).")
-        let event = store.events().first
+        let event = store.events().first { $0.kind == LogKind.simulator.rawValue }
         #expect(event?.kind == LogKind.simulator.rawValue)
         #expect(event?.actor == informant)
         #expect(event?.subject == "Viktor Vulnerable")
         #expect(event?.text == sim.lastEvent, "the archive catches every tick the UI shows")
+        let sealing = store.events().filter { $0.kind == LogKind.amendment.rawValue }
+        #expect(sealing.count == 1, "the flip is sealed once, not twice")
+        #expect(sealing.first?.text.contains("NEUTRALIZED") == true)
     }
 
     @Test("With no dossiers at hand the denunciation uses distinct pool names")
@@ -123,7 +128,9 @@ struct PeopleSimulatorTests {
         let target = PeopleSimulator.npcNamePool[1]
         #expect(reports[0].informantName == informant)
         #expect(reports[0].targetName == target)
-        #expect(sim.lastEvent == "\(informant) denounced \(target): \(ReportFormView.Offence.all[0].title).")
+        #expect(
+            sim.lastEvent
+                == "\(informant) denounced \(target): \(ReportFormView.Offence.all[0].title).")
     }
 
     // MARK: - 0.20 — a note appears in the file
@@ -284,5 +291,114 @@ struct PeopleSimulatorTests {
         // A second call at the same instant must not reopen history.
         sim.advance(now: t0.addingTimeInterval(3600))
         #expect(store.reports().count == 25)
+    }
+
+    // MARK: - The sweep of the people (automatic neutralization)
+
+    @Test("Five denunciations neutralize a citizen and seal the file exactly once")
+    func fiveReportsNeutralizeAndLogOnce() {
+        let store = makeSimulatorStore()
+        let id = store.addCitizen(
+            name: "Reported Rita", affiliation: "Textile Combine", dossierNote: "")
+        for _ in 0..<5 {
+            store.addReport(
+                citizenId: id, targetName: "Reported Rita",
+                offence: "Suspicious silence", category: "verbal", severity: "watchlist",
+                details: "Silence, five times certified.", informantName: "A vigilant neighbour")
+        }
+        #expect(
+            TrustScore.raw(for: store.citizen(id: id)!) == 25,
+            "the unclamped figure is what the Authority reads")
+        TrustEnforcement.enforce(id: id, store: store)
+        #expect(store.citizen(id: id)?.status == .neutralized)
+        let sealing = store.events().filter { $0.kind == LogKind.amendment.rawValue }
+        #expect(sealing.count == 1)
+        #expect(sealing.first?.actor == "The Authority")
+        #expect(sealing.first?.subject == "Reported Rita")
+        #expect(sealing.first?.text.contains("NEUTRALIZED") == true)
+    }
+
+    @Test("Zero raw neutralizes; one point above is mere surveillance")
+    func rawBoundary() {
+        let store = makeSimulatorStore()
+        let doomedId = store.addCitizen(
+            name: "Exactly Zoltán", affiliation: "Cannery", dossierNote: "")
+        if var doomed = store.citizen(id: doomedId) {
+            doomed.status = .cleared
+            doomed.trustFlux = -100
+            store.setCitizen(doomed)
+        }
+        #expect(TrustScore.raw(for: store.citizen(id: doomedId)!) == 0)
+        TrustEnforcement.enforce(id: doomedId, store: store)
+        #expect(store.citizen(id: doomedId)?.status == .neutralized, "zero is the line")
+
+        let sparedId = store.addCitizen(
+            name: "One Above", affiliation: "Cannery", dossierNote: "")
+        if var spared = store.citizen(id: sparedId) {
+            spared.status = .cleared
+            spared.trustFlux = -99
+            store.setCitizen(spared)
+        }
+        #expect(TrustScore.raw(for: store.citizen(id: sparedId)!) == 1)
+        TrustEnforcement.enforce(id: sparedId, store: store)
+        #expect(
+            store.citizen(id: sparedId)?.status == .surveilled,
+            "one point above the line is watchful suspicion, not burial")
+    }
+
+    @Test("Enforcing the already-neutralized is a silent no-op")
+    func neutralizedEnforceIsSilent() {
+        let store = makeSimulatorStore()
+        let id = store.addCitizen(
+            name: "Nine Times Gone", affiliation: "Railway Union", dossierNote: "")
+        if var citizen = store.citizen(id: id) {
+            citizen.status = .neutralized
+            store.setCitizen(citizen)
+        }
+        for _ in 0..<9 {
+            store.addReport(
+                citizenId: id, targetName: "Nine Times Gone",
+                offence: "Listening to enemy radio", category: "musical",
+                severity: "consultancy", details: "Foreign jazz, nine evenings.",
+                informantName: "The theatre usher")
+        }
+        let before = store.events()
+        TrustEnforcement.enforce(id: id, store: store)
+        #expect(store.citizen(id: id)?.status == .neutralized)
+        #expect(store.events() == before, "the dead are not re-sentenced")
+    }
+
+    @Test("The sweep closes hopeless files even when the republic rests")
+    func sweepRunsOnQuietTick() {
+        let store = makeSimulatorStore()
+        seedProfile(store, alias: "Sparrow")
+        let doomedId = store.addCitizen(
+            name: "Doomed Dénes", affiliation: "Lumpenproletariat", dossierNote: "")
+        for _ in 0..<5 {
+            store.addReport(
+                citizenId: doomedId, targetName: "Doomed Dénes",
+                offence: "Suspicious silence", category: "verbal", severity: "watchlist",
+                details: "Certified quiet.", informantName: "A vigilant neighbour")
+        }
+        for _ in 0..<7 {
+            store.addReport(
+                citizenId: nil, targetName: "Sparrow",
+                offence: "Hoarding Western jokes", category: "verbal",
+                severity: "reeducation", details: "Seven tellings of the same joke.",
+                informantName: "The queue")
+        }
+        let sim = PeopleSimulator(store: store, now: t0)
+        // branch 0.9 — the republic rests; the sweep must run regardless.
+        sim.rand = scriptedRand([0.9])
+        sim.advance(now: t0.addingTimeInterval(15))
+
+        #expect(
+            store.citizen(id: doomedId)?.status == .neutralized,
+            "the sweep does not wait for the lottery")
+        #expect(sim.lastEvent == nil, "no weighted event fired, yet the files were closed")
+        #expect(store.kvString("player_fate") == "neutralized")
+        let rows = store.events().filter { $0.kind == LogKind.player.rawValue }
+        #expect(rows.count == 1)
+        #expect(rows.first?.text == "Your file was closed. You loved Big Brother.")
     }
 }

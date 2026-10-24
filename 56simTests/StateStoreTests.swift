@@ -227,6 +227,91 @@ struct StateStoreTests {
         #expect(ArchiveModel.filter(events: events, kind: .plan, search: "").isEmpty)
     }
 
+    // MARK: - The unclamped figure and the fate of the comrade
+
+    @Test("raw() despairs below zero and boasts above a hundred; score() stays clamped")
+    func rawIsUnclamped() {
+        let doomed = Citizen(
+            name: "Doomed Dénes", affiliation: "Lumpenproletariat", reportCount: 20)
+        #expect(TrustScore.raw(for: doomed) == -200, "the archive keeps no floor for the hopeless")
+        #expect(TrustEnforcement.score(for: doomed) == 0, "the display keeps its floor")
+
+        let favourite = Citizen(name: "Pet Pál", affiliation: "Factory #7", trustFlux: 40)
+        #expect(TrustScore.raw(for: favourite) == 140)
+        #expect(TrustEnforcement.score(for: favourite) == 100, "and its ceiling")
+    }
+
+    @Test("Denunciations count against the alias only; playerFlux moves the figure")
+    func reportsAgainstPlayerCountsAlias() {
+        let store = makeStore()
+        #expect(TrustScore.reportsAgainstPlayer(store: store) == 0, "nobody to denounce yet")
+        #expect(TrustScore.playerRaw(store: store) == nil, "no file, no figure")
+
+        store.saveProfile(sampleProfile())
+        #expect(TrustScore.playerRaw(store: store) == 100)
+        store.addReport(
+            citizenId: nil, targetName: "Whisper", offence: "Suspicious silence",
+            category: "verbal", severity: "watchlist",
+            details: "Quiet at the checkpoint.", informantName: "The night porter")
+        store.addReport(
+            citizenId: nil, targetName: "Somebody Else", offence: "Suspicious silence",
+            category: "verbal", severity: "watchlist",
+            details: "Someone else's problem.", informantName: "The baker's apprentice")
+        #expect(
+            TrustScore.reportsAgainstPlayer(store: store) == 1,
+            "only the alias counts as you")
+
+        store.setKV("playerFlux", value: "-25")
+        #expect(TrustScore.playerRaw(store: store) == 60, "100 − 15 + the ministerial flux")
+    }
+
+    @Test("Seven denunciations close the comrade's file, once and forever")
+    func playerFateClosesFile() {
+        let store = makeStore()
+        store.saveProfile(sampleProfile())
+        for _ in 0..<7 {
+            store.addReport(
+                citizenId: nil, targetName: "Whisper", offence: "Hoarding Western jokes",
+                category: "verbal", severity: "reeducation",
+                details: "Seven tellings of the same joke.", informantName: "The night porter")
+        }
+        #expect(TrustScore.playerRaw(store: store) == -5)
+        #expect(PlayerFate.evaluate(store: store))
+        #expect(store.kvString("player_fate") == "neutralized")
+        let rows = store.events().filter { $0.kind == LogKind.player.rawValue }
+        #expect(rows.count == 1)
+        #expect(rows.first?.actor == "The Ministry of Love")
+        #expect(rows.first?.subject == "Whisper")
+        #expect(rows.first?.text == "Your file was closed. You loved Big Brother.")
+
+        #expect(!PlayerFate.evaluate(store: store), "the record never repeats a death sentence")
+        #expect(store.events().filter { $0.kind == LogKind.player.rawValue }.count == 1)
+    }
+
+    @Test("Six denunciations leave the comrade alive and the memo blank")
+    func playerFateSparesAtTen() {
+        let store = makeStore()
+        store.saveProfile(sampleProfile())
+        for _ in 0..<6 {
+            store.addReport(
+                citizenId: nil, targetName: "Whisper", offence: "Hoarding Western jokes",
+                category: "verbal", severity: "reeducation",
+                details: "Six tellings. The seventh is under investigation.",
+                informantName: "The night porter")
+        }
+        #expect(TrustScore.playerRaw(store: store) == 10)
+        #expect(!PlayerFate.evaluate(store: store))
+        #expect(store.kvString("player_fate") == nil, "no sentence, no seal")
+        #expect(store.events().filter { $0.kind == LogKind.player.rawValue }.isEmpty)
+    }
+
+    @Test("Without a comrade there is no fate to evaluate")
+    func playerFateNeedsProfile() {
+        let store = makeStore()
+        #expect(!PlayerFate.evaluate(store: store), "the Ministry declines to close an empty drawer")
+        #expect(store.kvString("player_fate") == nil)
+    }
+
     // MARK: - Export & import
 
     @Test("Export/import round-trip restores citizens, reports, and the comrade")

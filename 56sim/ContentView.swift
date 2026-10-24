@@ -24,6 +24,7 @@ struct ContentView: View {
     @State private var importFailed = false
     @State private var showSuicide = false
     @State private var lifeCaption: String?
+    @State private var playerFateSeen = false
     @State private var shareURL: ShareableURL?
     @AppStorage("stateHapticsMuted") private var stateSilenced = false
 
@@ -38,10 +39,22 @@ struct ContentView: View {
     }
 
     var body: some View {
-        if enrolled {
-            registry
-        } else {
-            ProfileSetupView()
+        Group {
+            if enrolled {
+                registry
+            } else {
+                ProfileSetupView()
+            }
+        }
+        .fullScreenCover(isPresented: $playerFateSeen) {
+            GameOverView(
+                finalTrust: TrustScore.playerRaw(store: store) ?? 0,
+                reportsAgainstYou: TrustScore.reportsAgainstPlayer(store: store),
+                onNewLife: {
+                    store.wipeAll()
+                    playerFateSeen = false
+                }
+            )
         }
     }
 
@@ -158,9 +171,11 @@ struct ContentView: View {
             }
             .task {
                 // The republic lives between bullets: one weighted event per tick.
+                playerFateSeen = store.kvString("player_fate") == "neutralized"
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(5))
                     simulator.advance(now: .now)
+                    playerFateSeen = store.kvString("player_fate") == "neutralized"
                 }
             }
             .safeAreaInset(edge: .top, alignment: .leading) {

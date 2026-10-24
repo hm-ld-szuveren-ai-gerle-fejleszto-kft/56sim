@@ -75,6 +75,13 @@ final class PeopleSimulator {
             lastTick = lastTick.addingTimeInterval(tickInterval)
             fired += 1
         }
+        // The sweep of the people: whatever the lottery decided or skipped,
+        // the Authority re-reads every open file and closes the hopeless ones
+        // — the comrade's included. An idle tick is no excuse for stale paper.
+        for citizen in store.citizens() where citizen.status != .neutralized {
+            TrustEnforcement.enforce(id: citizen.id, store: store)
+        }
+        PlayerFate.evaluate(store: store)
     }
 
     // MARK: - The lottery of history

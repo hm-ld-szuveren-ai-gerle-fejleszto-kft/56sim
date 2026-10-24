@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Full-screen wizard shown until a comrade is enrolled.
 struct ProfileSetupView: View {
@@ -23,6 +24,11 @@ struct ProfileSetupView: View {
     @State private var melody = Profile.melodies[0]
     @State private var membershipNumber = Profile.membershipNumber()
 
+    @State private var isImporting = false
+    @State private var pendingImportURL: URL?
+    @State private var showImportConfirm = false
+    @State private var importFailed = false
+
     private var canEnter: Bool {
         !fullName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !alias.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -31,6 +37,18 @@ struct ProfileSetupView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Button {
+                        isImporting = true
+                    } label: {
+                        Label("Import a comrade's Republic", systemImage: "square.and.arrow.down")
+                    }
+                    Text(
+                        "Or swear the oath below, comrade. One or the other — the state does not negotiate with double arrivals."
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
                 Section("Who You Are") {
                     TextField("Full name", text: $fullName)
                     TextField("Underground alias", text: $alias)
@@ -96,6 +114,32 @@ struct ProfileSetupView: View {
                     .disabled(!canEnter)
                 }
             }
+            .fileImporter(
+                isPresented: $isImporting, allowedContentTypes: [.data]
+            ) { result in
+                if case .success(let url) = result {
+                    pendingImportURL = url
+                    showImportConfirm = true
+                }
+            }
+            .alert(
+                "Importing overwrites the current People's Republic. History will be revised.",
+                isPresented: $showImportConfirm
+            ) {
+                Button("Import") { performImport() }
+                Button("Cancel", role: .cancel) { pendingImportURL = nil }
+            }
+            .overlay(alignment: .bottom) {
+                if importFailed {
+                    banner(
+                        "The file was foreign. No revisions made.", tint: .red
+                    ) { importFailed = false }
+                    .task {
+                        try? await Task.sleep(for: .seconds(6))
+                        importFailed = false
+                    }
+                }
+            }
         }
     }
 
@@ -117,6 +161,37 @@ struct ProfileSetupView: View {
             kind: .profile, actor: profile.alias, subject: profile.alias,
             text: "\(profile.alias) enrolled as a comrade of the republic.")
         StateHaptics.shared.play(.tankRumble)
+    }
+
+    private func performImport() {
+        guard let url = pendingImportURL else { return }
+        pendingImportURL = nil
+        let secured = url.startAccessingSecurityScopedResource()
+        defer { if secured { url.stopAccessingSecurityScopedResource() } }
+        do {
+            try store.importReplace(from: url)
+        } catch {
+            importFailed = true
+        }
+    }
+
+    private func banner(_ text: String, tint: Color, onDismiss: @escaping () -> Void)
+        -> some View
+    {
+        HStack {
+            Text(text)
+                .font(.subheadline.bold())
+                .foregroundStyle(tint == .secondary ? Color.primary : Color.white)
+            Spacer()
+            Button("Dismiss") { onDismiss() }
+                .font(.caption)
+        }
+        .padding()
+        .background(
+            tint == .secondary ? Color(.secondarySystemBackground) : tint,
+            in: RoundedRectangle(cornerRadius: 10)
+        )
+        .padding()
     }
 }
 
