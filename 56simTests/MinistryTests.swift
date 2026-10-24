@@ -45,6 +45,24 @@ struct MinistryTests {
         #expect(TrustEnforcement.score(for: clean) == 100)
     }
 
+    @Test("trustFlux lifts and sinks the deterministic score, still clamped")
+    func trustFluxMovesScore() {
+        var fluxed = Citizen(name: "Flux Kati", affiliation: "Railway Union", trustFlux: 30)
+        #expect(TrustEnforcement.score(for: fluxed) == 100, "the ceiling holds even for favourites")
+        fluxed.reportCount = 3
+        #expect(TrustEnforcement.score(for: fluxed) == 85)  // 100 − 45 + 30
+
+        let falling = Citizen(
+            name: "Falling Feri", affiliation: "Intellectual (regrettable)",
+            trustFlux: -20, reportCount: 5)
+        #expect(TrustEnforcement.score(for: falling) == 5)  // 100 − 75 − 20
+
+        let doomed = Citizen(
+            name: "Doomed Dénes", affiliation: "Lumpenproletariat",
+            trustFlux: -50, reportCount: 5)
+        #expect(TrustEnforcement.score(for: doomed) == 0, "the floor is the floor")
+    }
+
     @Test("Low trust overturns a clearance but never a neutralization")
     func enforceOverridesCleared() {
         let store = makeStore()
@@ -114,8 +132,8 @@ struct MinistryTests {
         #expect(amendments.count == 2)
         #expect(amendments[1].justification == RecordOffice.justifications[1])
 
-        // Rotation wraps at 5.
-        for index in 2..<7 {
+        // Rotation wraps at the full stock (the complete appendix).
+        for index in 2..<55 {
             let next = CitizenStatus.allCases[index % 3]
             RecordOffice.amend(
                 citizenId: citizenId, field: "status",
@@ -125,8 +143,20 @@ struct MinistryTests {
             )
             amendments = store.amendments(citizenId: citizenId)
             #expect(
-                amendments[index].justification == RecordOffice.justifications[index % 5])
+                amendments[index].justification
+                    == RecordOffice.justifications[index % RecordOffice.justifications.count])
         }
+    }
+
+    @Test("Justification stock holds the full appendix, non-duplicated, in order")
+    func justificationStock() {
+        // The appendix lists 46 corrections to add to the original five;
+        // the ministry minutes said "45 → 50" and miscounted, as ministries do.
+        #expect(RecordOffice.justifications.count == 51)
+        #expect(
+            Set(RecordOffice.justifications).count == RecordOffice.justifications.count)
+        #expect(RecordOffice.justifications[0] == "The record has always shown this.")
+        #expect(RecordOffice.justifications.last == "The glue is older than the objection.")
     }
 
     @Test("State refusals: 25+25, disjoint, non-empty")
@@ -157,36 +187,91 @@ struct MinistryTests {
 
     // MARK: - Leaderboard (directive 4)
 
-    @Test("Leaderboard orders by reports, ties alphabetical, badges exact")
+    @Test("Leaderboard ranks net vigilance, ties alphabetical, YOU row included")
     func leaderboardOrdering() {
-        func filed(_ informant: String, count: Int) -> [Report] {
+        func filed(
+            _ informant: String, against victim: String? = nil, count: Int
+        ) -> [Report] {
             (0..<count).map { _ in
                 Report(
+                    targetName: victim,
                     offence: "Suspicious silence",
                     details: "Quiet as a subversion manual.",
                     informantName: informant)
             }
         }
-        var reports = filed("Amanuensis Alice", count: 3) + filed("Brave Boris", count: 5)
+        // Boris files 5 and suffers 2 → net 3 → Order of the Red Star.
+        var reports = filed("Brave Boris", count: 5)
+        reports += filed("Sneaky Stella", against: "Brave Boris", count: 2)
+        // Alice files 3 against nobody → net 3 → tie with Boris, settles alphabetically.
+        reports += filed("Amanuensis Alice", count: 3)
 
-        let entries = Leaderboard.entries(from: reports)
-        #expect(entries.map(\.name) == ["Brave Boris", "Amanuensis Alice"])
-        #expect(entries[0].reportCount == 5)
-        #expect(entries[0].badge == "Iron Neighbour")
-        #expect(entries[1].badge == "Order of the Red Star")
-
-        // Tie settles alphabetically.
-        reports += filed("Cautious Carla", count: 3)
-        let tied = Leaderboard.entries(from: reports)
-        #expect(tied.map(\.name) == ["Brave Boris", "Amanuensis Alice", "Cautious Carla"])
+        let entries = Leaderboard.entries(from: reports, profileAlias: "Sparrow")
+        #expect(
+            entries.map(\.name)
+                == ["Amanuensis Alice", "Brave Boris", "Sneaky Stella", "Sparrow"])
+        let boris = entries[1]
+        #expect(boris.filed == 5)
+        #expect(boris.received == 2)
+        #expect(boris.net == 3)
+        #expect(boris.badge == "Order of the Red Star")
+        #expect(entries[0].badge == "Order of the Red Star")
+        let stella = entries[2]
+        #expect(stella.filed == 2)
+        #expect(stella.received == 0)
+        #expect(stella.badge == "Loyal Ear")
+        let you = entries.last
+        #expect(you?.isYou == true)
+        #expect(you?.name == "Sparrow")
+        #expect(you?.filed == 0)
+        #expect(you?.received == 0)
     }
 
-    @Test("Badge thresholds flip at 1, 3, 5, 10")
+    @Test("Net badges flip at 3, 5, 10; denunciations against you demote visibly")
     func badgeThresholds() {
-        #expect(LeaderboardEntry(name: "X", reportCount: 1).badge == "Loyal Ear")
-        #expect(LeaderboardEntry(name: "X", reportCount: 3).badge == "Order of the Red Star")
-        #expect(LeaderboardEntry(name: "X", reportCount: 5).badge == "Iron Neighbour")
-        #expect(LeaderboardEntry(name: "X", reportCount: 10).badge == "People's Antenna")
+        #expect(LeaderboardEntry(name: "X", filed: 1, received: 0).badge == "Loyal Ear")
+        #expect(
+            LeaderboardEntry(name: "X", filed: 3, received: 0).badge == "Order of the Red Star")
+        #expect(LeaderboardEntry(name: "X", filed: 5, received: 0).badge == "Iron Neighbour")
+        #expect(LeaderboardEntry(name: "X", filed: 10, received: 0).badge == "People's Antenna")
+        // Ten filed against you drags a People's Antenna down to Loyal Ear.
+        #expect(LeaderboardEntry(name: "X", filed: 10, received: 10).badge == "Loyal Ear")
+        #expect(LeaderboardEntry(name: "X", filed: 13, received: 8).badge == "Iron Neighbour")
+        #expect(LeaderboardEntry(name: "X", filed: 1, received: 9).badge == "Loyal Ear")
+    }
+
+    @Test("The comrade is ranked as a YOU row with their own filed and received")
+    func youRow() {
+        let reports = [
+            Report(
+                targetName: "Sparrow", offence: "Suspicious silence",
+                informantName: "Nagy Pál"),
+            Report(
+                targetName: "Someone Else", offence: "Suspicious silence",
+                informantName: "Sparrow"),
+            Report(
+                targetName: "Someone Else", offence: "Suspicious silence",
+                informantName: "Sparrow"),
+        ]
+        let entries = Leaderboard.entries(from: reports, profileAlias: "Sparrow")
+        #expect(entries.filter { $0.name == "Sparrow" }.count == 1)
+        let you = entries.first { $0.isYou }
+        #expect(you?.filed == 2)
+        #expect(you?.received == 1)
+        #expect(you?.net == 1)
+        #expect(entries.first { $0.name == "Nagy Pál" }?.badge == "Loyal Ear")
+    }
+
+    @Test("Reports against dossiers resolve the victim from the citizen table")
+    func victimResolvesFromCitizenId() {
+        let reports = [
+            Report(citizenId: 7, offence: "Whistling in four tones", informantName: "Nagy Pál")
+        ]
+        let entries = Leaderboard.entries(
+            from: reports, profileAlias: nil, citizenNames: [7: "Kovács Géza"])
+        #expect(entries.first { $0.name == "Kovács Géza" }?.received == 1)
+        #expect(entries.first { $0.name == "Nagy Pál" }?.filed == 1)
+        #expect(entries.allSatisfy { !$0.isYou }, "no alias, no YOU row")
     }
 
     // MARK: - Five-Year Plan (directive 6)
@@ -243,7 +328,12 @@ struct MinistryTests {
         #expect(
             !Checkpoint.isCorrect(
                 (question.correctIndex + 1) % question.answers.count, on: question))
-        #expect(Checkpoint.questions.count >= 6)
+        #expect(Checkpoint.questions.count >= 20, "the republic asks more of you now")
+        #expect(Checkpoint.questions.allSatisfy { $0.answers.count == 4 })
+        #expect(
+            Checkpoint.questions.allSatisfy {
+                $0.correctIndex >= 0 && $0.correctIndex < $0.answers.count
+            })
     }
 
     @Test("A wrong answer detains for exactly ten seconds, then releases to the action")
@@ -259,16 +349,20 @@ struct MinistryTests {
 
     // MARK: - Defector (directive 8)
 
-    @Test("Escape graph resolves, terminates in three fates, and never loops")
+    @Test("Escape graph resolves, terminates in six fates, and never loops")
     func defectorGraph() throws {
         #expect(Defector.nodes[Defector.startID] != nil)
         let endings = Defector.nodes.values.filter(\.isEnding)
         let endingTexts = Set(endings.map(\.text))
-        #expect(endings.count >= 3)
+        #expect(endings.count >= 6)
         #expect(endingTexts.contains("REACHED AUSTRIA. TRULY."))
         #expect(endingTexts.contains("RESETTLED TO SIBERIA FOR AGRICULTURAL CONSULTANCY."))
         #expect(endingTexts.contains("SENTENCED TO 10 YEARS OF LISTENING TO APPROVED MUSIC."))
-        #expect(Defector.nodes.count >= 12)
+        #expect(
+            endingTexts.contains("MADE ATTACHÉ TO THE CIRCUS IN VIENNA. TRAPEZE, NOT TRAITS."))
+        #expect(
+            endingTexts.contains("APPOINTED MINISTER OF RUMOURS. THE RUMOURS DISAPPROVED."))
+        #expect(Defector.nodes.count >= 30)
 
         // Every choice resolves to a real node.
         for node in Defector.nodes.values {
@@ -291,6 +385,21 @@ struct MinistryTests {
         var stack = Set<String>()
         #expect(
             visit(Defector.startID, stack: &stack), "history repeats itself — cycles are banned")
+
+        // The new fates are reachable from the front door: the circus and
+        // the ministry of rumours are endings people can actually arrive at.
+        func reaches(_ target: String) -> Bool {
+            var seen: Set<String> = []
+            var queue = [Defector.startID]
+            while let id = queue.popLast() {
+                guard seen.insert(id).inserted else { continue }
+                if id == target { return true }
+                queue.append(contentsOf: Defector.nodes[id]?.choices.map(\.nextId) ?? [])
+            }
+            return false
+        }
+        #expect(reaches("circus"), "the trapeze awaits the reliable")
+        #expect(reaches("rumour"), "the rumour ministry keeps an opening")
     }
 
     // MARK: - Radio Moscow (directive 9)

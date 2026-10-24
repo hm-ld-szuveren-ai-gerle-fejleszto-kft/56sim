@@ -13,6 +13,7 @@ import UniformTypeIdentifiers
 /// Until a comrade is enrolled, the whole republic is a setup wizard.
 struct ContentView: View {
     @State private var store = StateStore.shared
+    @State private var simulator = PeopleSimulator.shared
 
     @State private var selectedCitizenId: Int64?
     @State private var isAddingCitizen = false
@@ -106,6 +107,9 @@ struct ContentView: View {
                             Label("Interrogation Room 407", systemImage: "lamp.desk")
                         }
                         Divider()
+                        NavigationLink(value: Ministry.paper) {
+                            Label("The People's Paper", systemImage: "newspaper")
+                        }
                         NavigationLink(value: Ministry.archive) {
                             Label("The Archive of the People", systemImage: "doc.text.magnifyingglass")
                         }
@@ -138,6 +142,7 @@ struct ContentView: View {
                 case .radio: RadioMoscowView()
                 case .poster: PosterGeneratorView()
                 case .interrogation: InterrogationView()
+                case .paper: PeoplesPaperView()
                 case .archive: ArchiveView()
                 }
             }
@@ -148,6 +153,29 @@ struct ContentView: View {
                     try? await Task.sleep(for: .seconds(Int.random(in: 4...9)))
                     if Double.random(in: 0..<1) < 0.4 {
                         StateHaptics.shared.play(.strayBullet)
+                    }
+                }
+            }
+            .task {
+                // The republic lives between bullets: one weighted event per tick.
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(5))
+                    simulator.advance(now: .now)
+                }
+            }
+            .safeAreaInset(edge: .top, alignment: .leading) {
+                VStack(alignment: .leading, spacing: 6) {
+                    if simulator.playerDenouncedBy != nil {
+                        banner(
+                            "You have been denounced! The queue for your defence is forming.",
+                            tint: .red
+                        ) { simulator.playerDenouncedBy = nil }
+                    }
+                    if let lastEvent = simulator.lastEvent {
+                        Text(lastEvent)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal)
                     }
                 }
             }
@@ -361,6 +389,13 @@ struct CitizenDetailView: View {
                                 )
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                                if !report.offenceCategory.isEmpty || !report.offenceSeverity.isEmpty {
+                                    Text(
+                                        "\(OffenceCategory(rawValue: report.offenceCategory)?.label ?? report.offenceCategory) · \(OffenceSeverity(rawValue: report.offenceSeverity)?.label ?? report.offenceSeverity) \(OffenceSeverity(rawValue: report.offenceSeverity)?.marks ?? "")"
+                                    )
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                }
                             }
                         }
                     }
@@ -477,6 +512,7 @@ enum Ministry: Hashable {
     case radio
     case poster
     case interrogation
+    case paper
     case archive
 }
 extension CitizenStatus {

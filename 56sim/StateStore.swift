@@ -496,6 +496,11 @@ final class StateStore {
         bump()
     }
 
+    /// kv read as a ledger figure; anything unparseable counts as zero output.
+    func kvInt(_ key: String) -> Int {
+        kvString(key).flatMap(Int.init) ?? 0
+    }
+
     // MARK: - The record of everything
 
     /// One line of history, trimmed to the newest 500 rows.

@@ -68,6 +68,84 @@ enum Checkpoint {
             answers: ["Nobody, I trust no one", "Myself", "The postman", "My neighbour, proudly"],
             correctIndex: 3
         ),
+        CheckpointQuestion(
+            prompt: "What time does the bakery open?",
+            answers: ["When bread exists", "At 06:00 sharp", "Yesterday", "Bakery is a western myth"],
+            correctIndex: 1
+        ),
+        CheckpointQuestion(
+            prompt: "How many tones does an approved melody contain?",
+            answers: ["Four, suspiciously", "Five", "Seven, decadent", "Whatever you hear"],
+            correctIndex: 1
+        ),
+        CheckpointQuestion(
+            prompt: "Who was right yesterday?",
+            answers: ["Everyone, equally", "Nobody", "The Party", "Depends who is asking"],
+            correctIndex: 2
+        ),
+        CheckpointQuestion(
+            prompt: "What is the correct speed of a queue?",
+            answers: ["As fast as permitted, no faster", "Personal", "Optional", "Reverse"],
+            correctIndex: 0
+        ),
+        CheckpointQuestion(
+            prompt: "A rumour arrives. Your duty?",
+            answers: ["Verify it", "Repeat it accurately to the authorities", "Forget it loudly", "Print it"],
+            correctIndex: 1
+        ),
+        CheckpointQuestion(
+            prompt: "Which year is it, officially?",
+            answers: ["The good one", "Last year's, improved", "Any year you can prove", "The current year"],
+            correctIndex: 3
+        ),
+        CheckpointQuestion(
+            prompt: "The neighbour's cat is unregistered. You?",
+            answers: ["Feed it", "Adopt it", "Report it, with timestamps", "Register it yourself"],
+            correctIndex: 2
+        ),
+        CheckpointQuestion(
+            prompt: "Weather forecast: rain. Response?",
+            answers: ["Umbrella", "Complain", "Applaud the plan", "Blame the west"],
+            correctIndex: 2
+        ),
+        CheckpointQuestion(
+            prompt: "What does the state owe you?",
+            answers: ["Nothing and gratitude", "A house", "A holiday", "Explanation"],
+            correctIndex: 0
+        ),
+        CheckpointQuestion(
+            prompt: "Your cousin crosses the border. He is?",
+            answers: ["Missed", "Enlightened", "A clerical error", "Reported"],
+            correctIndex: 3
+        ),
+        CheckpointQuestion(
+            prompt: "Bananas are: ",
+            answers: ["Green", "Yellow", "A five-year target", "A rumour"],
+            correctIndex: 2
+        ),
+        CheckpointQuestion(
+            prompt: "Two tractors enter the field. How many leave?",
+            answers: ["As many as reported", "One", "Both, tired", "Zero"],
+            correctIndex: 0
+        ),
+        CheckpointQuestion(
+            prompt: "The correct way to read a newspaper?",
+            answers: [
+                "Aloud to yourself", "Backwards, for subtext",
+                "Front page twice, then report it", "Skipping the weather",
+            ],
+            correctIndex: 2
+        ),
+        CheckpointQuestion(
+            prompt: "Which opinions are free?",
+            answers: ["The approved ones", "None", "Private ones", "Tuesday's"],
+            correctIndex: 0
+        ),
+        CheckpointQuestion(
+            prompt: "Who is always watching?",
+            answers: ["The neighbours", "You", "The state", "All of the above, proudly"],
+            correctIndex: 3
+        ),
     ]
 
     /// A random challenge fires on 30 % of gated actions.
