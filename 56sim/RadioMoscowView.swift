@@ -6,7 +6,6 @@
 //  occasionally announcing the weather as a political victory.
 //
 
-import AVFoundation
 import SwiftData
 import SwiftUI
 
@@ -85,31 +84,11 @@ enum RadioMoscow {
     }
 }
 
-/// Voice of the state. Slow, British, deeply unbothered.
-actor SpeechAnnouncer {
-    nonisolated(unsafe) private let synthesizer = AVSpeechSynthesizer()
-
-    func speak(_ text: String) {
-        synthesizer.stopSpeaking(at: .immediate)
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-GB")
-        utterance.rate = 0.45
-        synthesizer.speak(utterance)
-    }
-
-    func stop() {
-        synthesizer.stopSpeaking(at: .immediate)
-    }
-
-    var isSpeaking: Bool { synthesizer.isSpeaking }
-}
-
 struct RadioMoscowView: View {
     @Query(sort: \Broadcast.postedAt, order: .reverse) private var broadcasts: [Broadcast]
 
-    @State private var announcer = SpeechAnnouncer()
+    @State private var announcer = PiperAnnouncer.shared
     @State private var tickerIndex = 0
-    @State private var isSpeaking = false
 
     private var extraTitles: [String] { broadcasts.map(\.title) }
 
@@ -121,29 +100,49 @@ struct RadioMoscowView: View {
 
             TickerLine(
                 line: RadioMoscow.bulletin(at: tickerIndex, extraTitles: extraTitles),
-                onCycleComplete: { tickerIndex += 1 }
+                onCycleComplete: {
+                    tickerIndex += 1
+                    if announcer.isSpeaking {
+                        announcer.speak(
+                            RadioMoscow.bulletin(at: tickerIndex, extraTitles: extraTitles))
+                    }
+                }
             )
             .id(tickerIndex)
             .frame(height: 56)
             .padding(.horizontal)
 
-            Button {
-                let index = Int(Date().timeIntervalSince1970 / 12)
-                let line = RadioMoscow.bulletin(at: index, extraTitles: extraTitles)
-                isSpeaking = true
-                Task { await announcer.speak(line) }
-            } label: {
-                Label("Announce", systemImage: "speaker.wave.3.fill")
+            switch announcer.phase {
+            case .notDownloaded:
+                Text("Turn up the volume to fetch the voice of the people (60 MB, once).")
+                    .font(.caption).foregroundStyle(.secondary)
+            case .downloading(let fraction):
+                VStack(spacing: 6) {
+                    ProgressView(value: fraction)
+                    Text("\(Int(fraction * 100))% — the state is rehearsing")
+                        .font(.caption).foregroundStyle(.secondary)
+                }.frame(maxWidth: 280)
+            case .failed(let reason):
+                Text(reason).font(.callout.bold()).foregroundStyle(.red)
+            case .ready:
+                EmptyView()
             }
-            .buttonStyle(.borderedProminent)
 
             Button {
-                isSpeaking = false
-                Task { await announcer.stop() }
+                announcer.speak(RadioMoscow.bulletin(at: tickerIndex, extraTitles: extraTitles))
+            } label: {
+                Label("Turn up the volume", systemImage: "speaker.wave.3.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(announcer.isSpeaking)
+
+            Button {
+                announcer.stop()
             } label: {
                 Label("Silence the radio", systemImage: "speaker.slash.fill")
             }
             .buttonStyle(.bordered)
+            .disabled(!announcer.isSpeaking)
 
             Text("Listening is a civic duty. Listening harder is a promotion.")
                 .font(.caption)
@@ -170,7 +169,11 @@ private struct TickerLine: View {
             Text(line)
                 .font(.system(.body, design: .monospaced).bold())
                 .fixedSize()
-                .onGeometryChange(for: CGFloat.self) { proxy in proxy.size.width } action: { textWidth = $0 }
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.width
+                } action: {
+                    textWidth = $0
+                }
                 .offset(x: offset)
                 .onAppear {
                     offset = geo.size.width
